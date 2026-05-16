@@ -19,6 +19,7 @@ import {
   updateRowsAction, 
   deleteRowsAction 
 } from './actions';
+import { matchChosung } from '@/utils/koreanUtils';
 
 interface PaymentRecord {
   id: number;
@@ -168,11 +169,11 @@ export default function PaymentManagementPage() {
   const filteredRecords = records.filter(r => {
     const matchesFilter = filter === 'ALL' || r.status === filter;
     const matchesSearch = 
-      r.depositor_name.includes(searchTerm) || 
-      (r.student_name && r.student_name.includes(searchTerm)) ||
-      (r.parent_name && r.parent_name.includes(searchTerm)) ||
+      matchChosung(r.depositor_name || '', searchTerm) || 
+      matchChosung(r.student_name || '', searchTerm) ||
+      matchChosung(r.parent_name || '', searchTerm) ||
       (r.parent_phone && r.parent_phone.includes(searchTerm)) ||
-      (r.class_name && r.class_name.includes(searchTerm));
+      matchChosung(r.class_name || '', searchTerm);
     return matchesFilter && matchesSearch;
   });
 
@@ -392,7 +393,7 @@ export default function PaymentManagementPage() {
                     </div>
                   </td>
                 </tr>
-              ) : bankTransactions.filter(t => (t.description || '').includes(searchTerm)).length === 0 ? (
+              ) : bankTransactions.filter(t => matchChosung(t.description || '', searchTerm)).length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-24 text-center text-slate-300 font-bold italic">
                     은행 거래 내역이 없습니다.
@@ -400,7 +401,7 @@ export default function PaymentManagementPage() {
                 </tr>
               ) : (
                 bankTransactions
-                  .filter(t => (t.description || '').includes(searchTerm))
+                  .filter(t => matchChosung(t.description || '', searchTerm))
                   .map((t, idx) => (
                   <tr key={idx} className="border-b border-[#F1F5F9] hover:bg-slate-50 transition-colors">
                     <td className="p-6">

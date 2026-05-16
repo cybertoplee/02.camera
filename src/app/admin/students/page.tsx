@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, LayoutGrid, Table, Download, FileSpreadsheet, UploadCloud, Settings, RefreshCw, Inbox, User, ClipboardEdit, Lightbulb, Camera, Search } from 'lucide-react';
+import { ArrowLeft, LayoutGrid, Table, Download, FileSpreadsheet, UploadCloud, Settings, RefreshCw, Inbox, User, ClipboardEdit, Lightbulb, Camera, Search, CheckCircle2 } from 'lucide-react';
 import { queryTable, deleteRows, updateRows, insertRows, executeSQL } from '@root/egdesk-helpers';
+import { matchChosung } from '@/utils/koreanUtils';
 
 interface Student {
   id: number;
@@ -39,6 +40,7 @@ export default function StudentManagementPage() {
   const [importData, setImportData] = useState<any[]>([]);
   const [editFormData, setEditFormData] = useState<any>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'ON_HOLD' | 'DISCHARGED'>('ACTIVE');
 
   // Face Registration State
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -315,6 +317,7 @@ export default function StudentManagementPage() {
       rank: student.rank || '',
       memo: student.memo || '',
       class_id: student.class_id || '',
+      status: student.status || 'ACTIVE',
       receive_sms_in: student.receive_sms_in !== 'false',
       receive_sms_out: student.receive_sms_out !== 'false'
     };
@@ -449,6 +452,7 @@ export default function StudentManagementPage() {
             rank: data['급수'],
             memo: data['메모'],
             class_id: classId,
+            status: 'ACTIVE',
             face_vector: null
           };
           customFields.forEach(field => { row[field.field_name] = data[field.display_name]; });
@@ -480,6 +484,34 @@ export default function StudentManagementPage() {
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '16px' }}>
+            {[
+              { id: 'ACTIVE', label: '재원생' },
+              { id: 'ON_HOLD', label: '휴관생' },
+              { id: 'DISCHARGED', label: '퇴관생' }
+            ].map(tab => (
+              <button 
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id as any)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: statusFilter === tab.id ? '#FFFFFF' : 'transparent',
+                  color: statusFilter === tab.id ? '#2563EB' : '#64748B',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: statusFilter === tab.id ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
           <div style={{ position: 'relative' }} className="group mr-2">
             <Search 
               size={16} 
@@ -505,7 +537,7 @@ export default function StudentManagementPage() {
                 border: '1px solid #E2E8F0', 
                 fontWeight: 800, 
                 fontSize: '14px', 
-                width: '280px',
+                width: '240px',
                 outline: 'none',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
                 transition: 'all'
@@ -544,14 +576,17 @@ export default function StudentManagementPage() {
           <p className="text-slate-400 font-black tracking-widest text-sm">LOADING DATA...</p>
         </div>
       ) : students.filter(s => 
-          s.name.includes(searchTerm) || 
+          (s.status === statusFilter || (statusFilter === 'ACTIVE' && !s.status)) &&
+          (s.name.includes(searchTerm) || 
           (s.parent_name || '').includes(searchTerm) || 
           (s.parent_phone || '').includes(searchTerm) ||
-          (classMap[s.class_id] || '').includes(searchTerm)
+          (classMap[s.class_id] || '').includes(searchTerm))
         ).length === 0 ? (
         <div className="py-40 text-center bg-white/40 backdrop-blur-xl rounded-[48px] border-2 border-dashed border-white shadow-[0_8px_32px_rgba(0,0,0,0.02)]">
           <div className="flex justify-center mb-4"><Inbox size={48} strokeWidth={1} className="text-slate-400" /></div>
-          <p className="text-xl font-black text-slate-400">검색 결과가 없거나 등록된 관원이 없습니다.</p>
+          <p className="text-xl font-black text-slate-400">
+            {statusFilter === 'ACTIVE' ? '재원생 중' : statusFilter === 'ON_HOLD' ? '휴관생 중' : '퇴관생 중'} 검색 결과가 없습니다.
+          </p>
         </div>
       ) : (
         <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
@@ -559,7 +594,7 @@ export default function StudentManagementPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white">
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">이름 / 알림설정</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">상태 / 이름 / 알림</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">수련반</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">생년월일</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">보호자 정보</th>
@@ -570,26 +605,42 @@ export default function StudentManagementPage() {
               </thead>
               <tbody>
                 {students
-                  .filter(s => 
-                    s.name.includes(searchTerm) || 
-                    (s.parent_name || '').includes(searchTerm) || 
-                    (s.parent_phone || '').includes(searchTerm) ||
-                    (classMap[s.class_id] || '').includes(searchTerm)
-                  )
+                  .filter(s => {
+                    const matchesStatus = (s.status === statusFilter || (statusFilter === 'ACTIVE' && !s.status));
+                    if (!matchesStatus) return false;
+                    
+                    if (!searchTerm) return true;
+                    
+                    return (
+                      matchChosung(s.name || '', searchTerm) ||
+                      matchChosung(s.parent_name || '', searchTerm) ||
+                      (s.parent_phone || '').includes(searchTerm) ||
+                      matchChosung(classMap[s.class_id] || '', searchTerm)
+                    );
+                  })
                   .map((student) => (
-                  <tr key={student.id} className="group border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                  <tr key={student.id} className={`group border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${student.status !== 'ACTIVE' && student.status ? 'opacity-70 grayscale-[0.5]' : ''}`}>
                     <td className="p-8">
                       <div className="flex items-center gap-4">
-                        <div 
-                          onClick={() => student.profile_image && setPreviewImage(student.profile_image)}
-                          className={`w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-200 ${student.profile_image ? 'cursor-pointer hover:border-blue-500 hover:scale-105 active:scale-95 transition-all' : ''}`}
-                          title={student.profile_image ? "원본 보기" : ""}
-                        >
-                          {student.profile_image ? (
-                            <img src={student.profile_image} className="w-full h-full object-cover" alt={student.name} />
+                        <div className="flex flex-col gap-1 items-center">
+                          {student.status === 'ON_HOLD' ? (
+                            <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded-md">휴관</span>
+                          ) : student.status === 'DISCHARGED' ? (
+                            <span className="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-md">퇴관</span>
                           ) : (
-                            <User size={24} strokeWidth={1.5} className="text-slate-400" />
+                            <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md">재원</span>
                           )}
+                          <div 
+                            onClick={() => student.profile_image && setPreviewImage(student.profile_image)}
+                            className={`w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-200 ${student.profile_image ? 'cursor-pointer hover:border-blue-500 hover:scale-105 active:scale-95 transition-all' : ''}`}
+                            title={student.profile_image ? "원본 보기" : ""}
+                          >
+                            {student.profile_image ? (
+                              <img src={student.profile_image} className="w-full h-full object-cover" alt={student.name} />
+                            ) : (
+                              <User size={24} strokeWidth={1.5} className="text-slate-400" />
+                            )}
+                          </div>
                         </div>
                         <div>
                           <p className="font-black text-slate-900 text-lg">{student.name}</p>
@@ -862,6 +913,49 @@ export default function StudentManagementPage() {
                 <div className="flex flex-col gap-2 col-span-1 md:col-span-2 group">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">메모</label>
                   <textarea value={editFormData.memo} onChange={(e) => setEditFormData({...editFormData, memo: e.target.value})} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 h-32 focus:border-blue-500 focus:bg-white outline-none transition-all resize-none shadow-sm" placeholder="기타 특이사항" />
+                </div>
+
+                <div className="col-span-1 md:col-span-2 flex flex-col gap-4 mt-4 p-8 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
+                  <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                    <Settings size={14} /> 관원 상태 관리
+                  </label>
+                  <div className="flex gap-3">
+                    {[
+                      { id: 'ACTIVE', label: '재원 처리 (복관)', color: '#2563EB', activeBg: '#DBEAFE' },
+                      { id: 'ON_HOLD', label: '휴관 처리', color: '#D97706', activeBg: '#FEF3C7' },
+                      { id: 'DISCHARGED', label: '퇴관 처리', color: '#DC2626', activeBg: '#FEE2E2' }
+                    ].map(btn => (
+                      <button
+                        key={btn.id}
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`'${btn.label}' 하시겠습니까?`)) {
+                            setEditFormData({ ...editFormData, status: btn.id });
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '16px',
+                          borderRadius: '16px',
+                          border: (editFormData.status || 'ACTIVE') === btn.id ? `2px solid ${btn.color}` : '2px solid #E2E8F0',
+                          backgroundColor: (editFormData.status || 'ACTIVE') === btn.id ? btn.activeBg : '#FFFFFF',
+                          color: (editFormData.status || 'ACTIVE') === btn.id ? btn.color : '#64748B',
+                          fontWeight: 900,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        {(editFormData.status || 'ACTIVE') === btn.id && <CheckCircle2 size={16} />}
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 ml-1 font-bold italic">* 상태 변경 후 우측 상단의 '정보 수정 완료' 버튼을 눌러야 최종 저장됩니다.</p>
                 </div>
               </div>
             </div>

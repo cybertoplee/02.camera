@@ -25,20 +25,46 @@ export async function POST(request: Request) {
     };
     if (apiKey) headers['X-Api-Key'] = apiKey;
 
-    const rowData = {
-      name,
-      parent_name,
-      parent_phone,
-      class_id: parseInt(class_id, 10),
-      face_vector,
-      profile_image,
-      receive_sms_in,
-      receive_sms_out,
-      birth_date: '',
-      rank: '',
-      memo: ''
-    };
+    const rowData: any = {};
+    formData.forEach((value, key) => {
+      if (key === 'class_id') {
+        rowData[key] = parseInt(value as string, 10);
+      } else {
+        rowData[key] = value as string;
+      }
+    });
 
+    // Ensure defaults for essential fields if missing
+    if (!rowData.birth_date) rowData.birth_date = '';
+    if (!rowData.rank) rowData.rank = '';
+    if (!rowData.memo) rowData.memo = '';
+    if (!rowData.receive_sms_in) rowData.receive_sms_in = 'true';
+    if (!rowData.receive_sms_out) rowData.receive_sms_out = 'true';
+    if (!rowData.status) rowData.status = 'ACTIVE';
+
+    // 1. Duplicate check (Name + Birthdate)
+    const checkRes = await fetch(`${apiUrl}/user-data/tools/call`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        tool: 'user_data_query_table',
+        arguments: {
+          tableName: 'students',
+          filters: {
+            name: rowData.name,
+            birth_date: rowData.birth_date
+          }
+        }
+      })
+    });
+
+    const checkResult = await checkRes.json();
+    if (checkRes.ok && checkResult.success && checkResult.rows && checkResult.rows.length > 0) {
+      const birthInfo = rowData.birth_date ? `(생일: ${rowData.birth_date})` : '';
+      throw new Error(`이미 '${rowData.name}' ${birthInfo} 학생이 등록되어 있습니다.`);
+    }
+
+    // 2. Insert if not duplicate
     const res = await fetch(`${apiUrl}/user-data/tools/call`, {
       method: 'POST',
       headers,
@@ -57,11 +83,19 @@ export async function POST(request: Request) {
       throw new Error(errMsg);
     }
 
-    // Success! Redirect back to the mobile students list with a 303 See Other
-    // to ensure the browser performs a GET request instead of another POST.
-    return NextResponse.redirect(new URL('/m/students?registered=true', request.url), 303);
+    // Success! Redirect back to the mobile students list.
+    // Use the host header to ensure the IP/domain used by the client is preserved.
+    const host = request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto') || 'http';
+    const redirectTarget = new URL('/m/students?registered=true', `${protocol}://${host}`);
+    
+    return NextResponse.redirect(redirectTarget, 303);
   } catch (error: any) {
     console.error('Mobile registration POST error:', error);
-    return NextResponse.redirect(new URL(`/m/students/register?error=${encodeURIComponent(error.message || '알 수 없는 오류')}`, request.url), 303);
+    const host = request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto') || 'http';
+    const errorTarget = new URL(`/m/students/register?error=${encodeURIComponent(error.message || '알 수 없는 오류')}`, `${protocol}://${host}`);
+    
+    return NextResponse.redirect(errorTarget, 303);
   }
 }

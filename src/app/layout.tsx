@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import SidebarWrapper from "@/components/SidebarWrapper";
-import PWARegister from "@/components/PWARegister";
 import MobileRedirect from "@/components/MobileRedirect";
 
 const geistSans = Geist({
@@ -18,14 +18,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EG DESK | AI Taekwondo Management",
   description: "AI-powered Taekwondo management system",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "EG DESK",
-  },
-  formatDetection: {
-    telephone: false,
-  },
 };
 
 export const viewport = {
@@ -48,18 +40,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script
+        <Script
+          id="unregister-sw"
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  let didUnregister = false;
                   for(let registration of registrations) {
                     registration.unregister();
-                    didUnregister = true;
-                  }
-                  if (didUnregister) {
-                    window.location.reload();
+                    console.log('ServiceWorker unregistered successfully');
                   }
                 });
               }
@@ -69,7 +58,6 @@ export default function RootLayout({
       </head>
       <body className="min-h-full" suppressHydrationWarning style={{ margin: 0, padding: 0 }}>
         <MobileRedirect />
-        <PWARegister />
         <SidebarWrapper>
           {children}
         </SidebarWrapper>

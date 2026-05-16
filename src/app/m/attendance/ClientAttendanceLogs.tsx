@@ -1,90 +1,164 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Search, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { LogIn, LogOut, SearchX, AlertCircle, Phone, UserX, Clock } from 'lucide-react';
 
-export default function ClientAttendanceLogs({ initialLogs }: { initialLogs: any[] }) {
-  const [searchTerm, setSearchTerm] = useState('');
 
-  // NOTE: Server-side rendering guarantees the initial data is loaded instantly.
-  // Polling can be implemented later by fetching a new GET /api/attendance_logs endpoint
-  // But for now, we just rely on the user refreshing the page to see new logs,
-  // which guarantees we bypass the Android POST block.
+export default function ClientAttendanceLogs({ initialLogs, allStudents, error }: { initialLogs: any[], allStudents: any[], error?: string | null }) {
+  const [filter, setFilter] = React.useState<'ALL' | 'NOT_IN' | 'NOT_OUT'>('ALL');
 
-  const filtered = initialLogs.filter(log => 
-    (log.student_name || '').includes(searchTerm) || 
-    (log.class_name || '').includes(searchTerm)
-  );
+  const handlePhoneClick = (e: React.MouseEvent, phone: string) => {
+    e.stopPropagation();
+    window.location.href = `tel:${phone}`;
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 pt-safe">
-      <header className="bg-white px-5 py-4 sticky top-0 z-10 shadow-sm border-b border-slate-100 flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">오늘 출결 기록</h1>
-          <span className="text-sm font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-            총 {filtered.length}건
-          </span>
+      <header className="bg-white/80 backdrop-blur-xl px-5 py-4 sticky top-0 z-10 shadow-sm border-b border-slate-200/50">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">오늘의 출결</h1>
+            <p className="text-sm text-slate-500 font-medium mt-0.5">실시간 출결 현황을 확인하세요.</p>
+          </div>
         </div>
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="이름 또는 수련반 검색..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-100/50 border-none rounded-2xl py-3 pl-11 pr-4 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
+        
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl">
+          {[
+            { id: 'ALL', label: '전체' },
+            { id: 'NOT_IN', label: '미등원' },
+            { id: 'NOT_OUT', label: '미하원' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilter(tab.id as any)}
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                filter === tab.id 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-slate-500'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
-      <div className="p-4 flex flex-col gap-3">
-        {filtered.length === 0 ? (
-          <div className="text-center py-20 flex flex-col items-center gap-3">
-            <Clock size={40} className="text-slate-300" />
-            <p className="text-slate-400 font-bold text-sm">오늘 출결 기록이 없습니다.</p>
+      <div className="p-4 flex flex-col gap-4">
+        {error && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-start gap-3">
+            <AlertCircle className="shrink-0 mt-0.5" size={20} />
+            <span className="text-sm font-semibold">{error}</span>
           </div>
-        ) : (
-          filtered.map((log) => {
-            const isOut = log.type === 'OUT';
+        )}
+
+        {(() => {
+          let displayLogs = initialLogs;
+          
+          if (filter === 'NOT_IN') {
+            const inIds = new Set(initialLogs.filter(l => l.type === 'IN').map(l => l.student_id));
+            displayLogs = allStudents
+              .filter(s => (s.status === 'ACTIVE' || !s.status) && !inIds.has(s.id))
+              .map(s => ({
+                id: `not-in-${s.id}`,
+                student_id: s.id,
+                student_name: s.name,
+                class_name: s.class_name || '',
+                parent_phone: s.parent_phone || '',
+                type: 'ABSENT',
+                timestamp: new Date().toISOString()
+              }));
+          } else if (filter === 'NOT_OUT') {
+            const inLogs = initialLogs.filter(l => l.type === 'IN');
+            const outIds = new Set(initialLogs.filter(l => l.type === 'OUT').map(l => l.student_id));
+            displayLogs = inLogs
+              .filter(l => !outIds.has(l.student_id))
+              .map(l => ({
+                ...l,
+                type: 'STAYING'
+              }));
+          }
+
+          if (displayLogs.length === 0) {
             return (
-              <div key={log.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isOut ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500'}`}>
-                    <span className="text-[10px] font-black">{isOut ? '하원' : '등원'}</span>
-                  </div>
-                  <div>
-                    <h2 className="text-base font-black text-slate-900">
-                      {log.student_name} 
-                      <span className="ml-2 text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{log.class_name || '미배정'}</span>
-                    </h2>
-                    <div className="flex items-center gap-1 mt-1 text-xs font-bold text-slate-500">
-                      <Clock size={12} />
-                      {new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <div className="bg-slate-100 p-4 rounded-full mb-4">
+                  <SearchX size={32} />
                 </div>
-                
-                <div className="flex flex-col items-end gap-1">
-                  {log.sms_status === 'SUCCESS' ? (
-                    <span className="flex items-center gap-1 text-[9px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-md">
-                      <CheckCircle2 size={10} /> 발송완료
-                    </span>
-                  ) : log.sms_status === 'SENDING' ? (
-                    <span className="flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span> 발송중
-                    </span>
-                  ) : log.sms_status === 'FAILED' ? (
-                    <span className="flex items-center gap-1 text-[9px] font-black text-red-600 bg-red-50 px-2 py-1 rounded-md">
-                      <AlertCircle size={10} /> 실패
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-bold text-slate-300">미발송</span>
-                  )}
+                <div className="font-bold text-lg text-slate-600">
+                  {filter === 'ALL' ? '오늘의 출결 기록이 없습니다.' : filter === 'NOT_IN' ? '모든 관원이 등원했습니다!' : '미하원 인원이 없습니다.'}
                 </div>
               </div>
             );
-          })
-        )}
+          }
+
+          return (
+            <div className="flex flex-col gap-3">
+              {displayLogs.map((log) => (
+                <div 
+                  key={log.id} 
+                  className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300 relative overflow-hidden"
+                >
+                  <div className="flex items-center gap-4 w-full">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-inner ${
+                      log.type === 'IN' ? 'bg-blue-50 text-blue-600' : 
+                      log.type === 'OUT' ? 'bg-rose-50 text-rose-600' : 
+                      log.type === 'ABSENT' ? 'bg-slate-100 text-slate-400' : 
+                      'bg-emerald-50 text-emerald-600'
+                    }`}>
+                      {log.type === 'IN' ? <LogIn size={20} /> : 
+                       log.type === 'OUT' ? <LogOut size={20} /> : 
+                       log.type === 'ABSENT' ? <UserX size={20} /> : 
+                       <Clock size={20} />}
+                    </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="font-bold text-slate-800 text-lg">{log.student_name}</span>
+                      {log.class_name && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md">
+                          {log.class_name}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        log.type === 'IN' ? 'bg-blue-100 text-blue-700' : 
+                        log.type === 'OUT' ? 'bg-rose-100 text-rose-700' : 
+                        log.type === 'ABSENT' ? 'bg-slate-200 text-slate-600' : 
+                        'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {log.type === 'IN' ? '등원' : 
+                         log.type === 'OUT' ? '하원' : 
+                         log.type === 'ABSENT' ? '결석' : 
+                         '수련중'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-1">
+                      {log.parent_phone ? (
+                        <button 
+                          onClick={(e) => handlePhoneClick(e, log.parent_phone)}
+                          className="flex items-center gap-1.5 text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md font-bold active:scale-95 transition-transform"
+                        >
+                          <Phone size={10} fill="currentColor" />
+                          {log.parent_phone}
+                        </button>
+                      ) : (
+                        <div></div>
+                      )}
+                      <div className="text-[11px] text-slate-400 font-bold">
+                        {new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {log.sms_status === 'sent' && (
+                  <div className="absolute top-2 right-2 text-[8px] font-black text-green-500 uppercase">
+                    SMS SENT
+                  </div>
+                )}
+              </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import { RefreshCw, Download, Search } from 'lucide-react';
 import { queryTable, deleteRows, executeSQL } from '@root/egdesk-helpers';
+import { matchChosung } from '@/utils/koreanUtils';
 
 interface AttendanceLog {
   id: number;
@@ -487,10 +488,10 @@ export default function AttendanceManagementPage() {
                   }
 
                   const filtered = displayData.filter(log => 
-                    (log.student_name || '').includes(searchTerm) || 
-                    (log.parent_name || '').includes(searchTerm) || 
+                    matchChosung(log.student_name || '', searchTerm) || 
+                    matchChosung(log.parent_name || '', searchTerm) || 
                     (log.parent_phone || '').includes(searchTerm) ||
-                    (log.class_name || '').includes(searchTerm)
+                    matchChosung(log.class_name || '', searchTerm)
                   );
 
                   if (filtered.length === 0) {
@@ -647,10 +648,10 @@ export default function AttendanceManagementPage() {
                     </td>
                   </tr>
                 ) : students.filter(s => 
-                    s.name.includes(searchTerm) || 
-                    (s.parent_name || '').includes(searchTerm) || 
+                    matchChosung(s.name || '', searchTerm) || 
+                    matchChosung(s.parent_name || '', searchTerm) || 
                     (s.parent_phone || '').includes(searchTerm) ||
-                    (classMap[s.class_id] || '').includes(searchTerm)
+                    matchChosung(classMap[s.class_id] || '', searchTerm)
                   ).length === 0 ? (
                   <tr>
                     <td colSpan={daysInMonth + 3} className="p-20 text-center">
@@ -659,10 +660,10 @@ export default function AttendanceManagementPage() {
                   </tr>
                 ) : (
                   students.filter(s => 
-                    s.name.includes(searchTerm) || 
-                    (s.parent_name || '').includes(searchTerm) || 
+                    matchChosung(s.name || '', searchTerm) || 
+                    matchChosung(s.parent_name || '', searchTerm) || 
                     (s.parent_phone || '').includes(searchTerm) ||
-                    (classMap[s.class_id] || '').includes(searchTerm)
+                    matchChosung(classMap[s.class_id] || '', searchTerm)
                   ).map(student => {
                     const studentData = monthlyData[student.id] || {};
                     const attendanceCount = Object.values(studentData).filter(logs => logs.includes('IN')).length;
