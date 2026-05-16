@@ -42,6 +42,7 @@ export async function setupDatabase() {
       { name: 'timestamp', type: 'TEXT', notNull: true },
       { name: 'type', type: 'TEXT', notNull: true }, // IN, OUT
       { name: 'status', type: 'TEXT' }, // NORMAL, LATE
+      { name: 'sms_status', type: 'TEXT', defaultValue: 'NONE' }, // NONE, SUCCESS, FAILED
     ], { tableName: 'attendance_logs', uniqueKeyColumns: ['id'] });
     console.log('Table "attendance_logs" created.');
   } catch (e: any) {

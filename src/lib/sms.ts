@@ -1,0 +1,105 @@
+import { queryTable, executeSQL, updateRows } from '@root/egdesk-helpers';
+import { gmAutomation } from '@/lib/google-messages';
+import fs from 'fs';
+import path from 'path';
+
+const LOG_FILE = 'c:\\dev\\egdesk-tkd\\storage\\sms-log.txt';
+const DEBUG_FILE = 'c:\\dev\\egdesk-tkd\\storage\\DEBUG_SMS.txt';
+
+function logToFile(message: string) {
+  const timestamp = new Date().toLocaleString('ko-KR');
+  const logMessage = `[${timestamp}] ${message}\n`;
+  try {
+    fs.appendFileSync(LOG_FILE, logMessage);
+  } catch (err) {
+    console.error('로그 파일 기록 실패:', err);
+  }
+}
+
+/**
+ * 학생 출결 알림 문자 발송
+ */
+export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
+  try {
+    // 디버그용 즉시 쓰기
+    fs.writeFileSync(DEBUG_FILE, `CALLED at ${new Date().toISOString()}`);
+    
+    logToFile(`[시작] 학생 ID: ${studentId}, 타입: ${type}`);
+
+    // 1. 시스템 설정 가져오기
+    const settingsRes = await queryTable('tkd_system_settings');
+    const settings = settingsRes.rows || [];
+    
+    const smsEnabledEntry = settings.find((s: any) => s.key === 'sms_enabled');
+    logToFile(`[설정 확인] sms_enabled 값: ${smsEnabledEntry?.value}`);
+
+    const isEnabled = smsEnabledEntry?.value === 'true' || smsEnabledEntry?.value === 'ON';
+    if (!isEnabled) {
+      logToFile(`[중단] SMS 발송 설정이 꺼져 있습니다. (현재값: ${smsEnabledEntry?.value})`);
+      return;
+    }
+
+    const templateIn = settings.find((s: any) => s.key === 'sms_template_in')?.value || '[EG태권도] {name} 학생이 {time}에 등원하였습니다.';
+    const templateOut = settings.find((s: any) => s.key === 'sms_template_out')?.value || '[EG태권도] {name} 학생이 {time}에 하원하였습니다.';
+    
+    // 2. 학생 및 학부모 정보 가져오기
+    const studentRes = await executeSQL(`SELECT name, parent_phone, parent_name FROM students WHERE id = ${studentId}`);
+    const student = studentRes.rows?.[0];
+    
+    if (!student) {
+      logToFile(`[에러] 학생 정보를 찾을 수 없습니다. (ID: ${studentId})`);
+      return;
+    }
+
+    if (!student.parent_phone) {
+      logToFile(`[중단] 학부모 연락처가 없습니다. (학생: ${student.name})`);
+      return;
+    }
+
+    // 3. 메시지 치환
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    const template = type === 'IN' ? templateIn : templateOut;
+    
+    const message = template
+      .replace('{name}', student.name)
+      .replace('{parent}', student.parent_name || '학부모님')
+      .replace('{time}', timeStr);
+
+    logToFile(`[준비] 수신처: ${student.parent_phone}, 내용: ${message}`);
+
+    // 4. Google 메시지 웹 자동화 발송
+    const result = await gmAutomation.sendSMS(student.parent_phone, message);
+
+    // 5. 결과 기록 (가장 최근의 해당 학생 출결 로그 업데이트)
+    try {
+      const lastLogRes = await executeSQL(`
+        SELECT id FROM attendance_logs 
+        WHERE student_id = ${studentId} 
+        ORDER BY timestamp DESC LIMIT 1
+      `);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const status = result.success ? 'SUCCESS' : 'FAILED';
+      await updateRows('attendance_logs', 
+        { sms_status: status }, 
+        { filters: { student_id: String(studentId), timestamp: todayStr + '%', type: type } }
+      );
+      logToFile(`[DB 업데이트] 학생 ${studentId} (${type}) 상태: ${status}`);
+    } catch (dbErr: any) {
+      logToFile(`[DB 업데이트 에러] ${dbErr.message}`);
+    }
+
+    if (result.success) {
+      logToFile(`[성공] 발송 완료 (${student.parent_phone})`);
+    } else {
+      logToFile(`[실패] 발송 에러: ${result.error}`);
+    }
+
+    return result;
+  } catch (err: any) {
+    logToFile(`[치명적 에러] ${err.message || err}`);
+    console.error('[SMS] 발송 처리 중 오류 발생:', err);
+    return { success: false, error: err };
+  }
+}
+

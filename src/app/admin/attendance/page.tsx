@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { RefreshCw } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { RefreshCw, Download, Search } from 'lucide-react';
 import { queryTable, deleteRows } from '@root/egdesk-helpers';
 
 interface AttendanceLog {
@@ -11,41 +12,93 @@ interface AttendanceLog {
   timestamp: string;
   type: string;
   status: string;
+  sms_status?: 'NONE' | 'SUCCESS' | 'FAILED';
   student_name?: string;
 }
 
 export default function AttendanceManagementPage() {
+  const [viewMode, setViewMode] = useState<'list' | 'monthly'>('list');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterMode, setFilterMode] = useState<'all' | 'not_in' | 'not_out'>('all');
+  const [refreshInterval, setRefreshInterval] = useState(1); // minutes
+  
+  const [classMap, setClassMap] = useState<Record<number, string>>({});
+  
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<Record<number, Record<number, string[]>>>({}); // studentId -> day -> types[]
+  
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    fetchLogs();
-  }, []);
+    if (viewMode === 'list') {
+      fetchLogs();
+    } else {
+      fetchMonthlyLogs();
+    }
+    fetchRefreshSettings();
+  }, [viewMode, selectedMonth]);
+
+  const fetchRefreshSettings = async () => {
+    try {
+      const res = await queryTable('tkd_system_settings');
+      const settings = res.rows || [];
+      const refresh = settings.find((s: any) => s.key === 'attendance_refresh_interval');
+      if (refresh) setRefreshInterval(Number(refresh.value));
+    } catch (err) {
+      console.warn('시스템 설정 테이블을 찾을 수 없어 기본 새로고침 주기를 사용합니다.');
+    }
+  };
+
+  useEffect(() => {
+    if (refreshInterval <= 0) return;
+
+    const timer = setInterval(() => {
+      if (viewMode === 'list') {
+        fetchLogs();
+      } else {
+        fetchMonthlyLogs();
+      }
+    }, refreshInterval * 60 * 1000);
+
+    return () => clearInterval(timer);
+  }, [refreshInterval, viewMode]);
 
   const fetchLogs = async () => {
     setLoading(true);
     setSelectedIds([]);
     try {
-      // 1. 모든 학생 정보 로드 (이름 매핑용)
-      const studentsRes = await queryTable('students');
-      const studentMap = new Map(
-        (studentsRes.rows || []).map((s: any) => [s.id, s.name])
-      );
+      const classesRes = await queryTable('student_classes');
+      const cmap: Record<number, string> = {};
+      classesRes.rows?.forEach((cls: any) => {
+        cmap[cls.id] = cls.name;
+      });
+      setClassMap(cmap);
 
-      // 2. 출결 기록 로드 (최신순 100건)
+      const studentsRes = await queryTable('students');
+      const studentMap = new Map((studentsRes.rows || []).map((s: any) => [s.id, s]));
+      setStudents(studentsRes.rows || []);
+
       const logsRes = await queryTable('attendance_logs', {
         limit: 100,
         orderBy: 'id',
         orderDirection: 'DESC'
       });
 
-      const formattedLogs = (logsRes.rows || []).map((log: any) => ({
-        ...log,
-        student_name: studentMap.get(log.student_id) || `ID: ${log.student_id}`
-      }));
+      const formattedLogs = (logsRes.rows || []).map((log: any) => {
+        const student = studentMap.get(log.student_id);
+        return {
+          ...log,
+          student_name: student?.name || `ID: ${log.student_id}`,
+          parent_name: student?.parent_name || '',
+          parent_phone: student?.parent_phone || '',
+          class_name: student ? (cmap[student.class_id] || '') : ''
+        };
+      });
 
       setLogs(formattedLogs);
     } catch (err) {
@@ -53,6 +106,79 @@ export default function AttendanceManagementPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchMonthlyLogs = async () => {
+    setLoading(true);
+    try {
+      const classesRes = await queryTable('student_classes');
+      const cmap: Record<number, string> = {};
+      classesRes.rows?.forEach((cls: any) => {
+        cmap[cls.id] = cls.name;
+      });
+      setClassMap(cmap);
+
+      const studentsRes = await queryTable('students');
+      setStudents(studentsRes.rows || []);
+
+      const logsRes = await queryTable('attendance_logs', {
+        limit: 5000,
+      });
+
+      const filteredLogs = (logsRes.rows || []).filter((log: any) => {
+        return log.timestamp.startsWith(selectedMonth);
+      });
+
+      const data: Record<number, Record<number, string[]>> = {};
+      filteredLogs.forEach((log: any) => {
+        const day = new Date(log.timestamp).getDate();
+        if (!data[log.student_id]) data[log.student_id] = {};
+        if (!data[log.student_id][day]) data[log.student_id][day] = [];
+        if (!data[log.student_id][day].includes(log.type)) {
+          data[log.student_id][day].push(log.type);
+        }
+      });
+
+      setMonthlyData(data);
+    } catch (err) {
+      console.error('월간 데이터 로드 실패:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadMonthlyExcel = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    // 헤더 생성
+    const headers = ['관원 이름', '수련반', '등원횟수'];
+    for (let i = 1; i <= daysInMonth; i++) {
+      headers.push(`${i}일`);
+    }
+
+    // 데이터 생성
+    const excelData = students.map(student => {
+      const studentData = monthlyData[student.id] || {};
+      const attendanceCount = Object.values(studentData).filter(logs => logs.includes('IN')).length;
+      
+      const row: any = {
+        '관원 이름': student.name,
+        '수련반': classMap[student.class_id] || '미배정',
+        '등원횟수': attendanceCount
+      };
+
+      for (let i = 1; i <= daysInMonth; i++) {
+        row[`${i}일`] = studentData[i]?.includes('IN') ? 'O' : 'X';
+      }
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '출결현황');
+    
+    XLSX.writeFile(workbook, `출결현황_${selectedMonth}.xlsx`);
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,108 +224,520 @@ export default function AttendanceManagementPage() {
     }
   };
 
+  if (!mounted) return null;
+
+  const [year, month] = selectedMonth.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em' }}>출결 기록 관리</h2>
         </div>
         
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {selectedIds.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ position: 'relative' }} className="group mr-2">
+            <Search 
+              size={16} 
+              style={{ 
+                position: 'absolute', 
+                left: '16px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                pointerEvents: 'none',
+                color: '#94A3B8'
+              }} 
+            />
+            <input 
+              type="text" 
+              placeholder="관원명 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ 
+                padding: '12px 24px 12px 48px', 
+                backgroundColor: '#FFFFFF', 
+                color: '#475569', 
+                borderRadius: '16px', 
+                border: '1px solid #E2E8F0', 
+                fontWeight: 800, 
+                fontSize: '14px', 
+                width: '240px',
+                outline: 'none',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+                transition: 'all'
+              }}
+              className="focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5"
+            />
+          </div>
+
+          <button 
+            onClick={() => setViewMode('list')}
+            style={{ 
+              padding: '12px 24px', 
+              backgroundColor: viewMode === 'list' ? '#2563EB' : '#FFFFFF', 
+              color: viewMode === 'list' ? '#FFFFFF' : '#475569', 
+              borderRadius: '16px', 
+              border: viewMode === 'list' ? 'none' : '1px solid #E2E8F0', 
+              fontWeight: 800, 
+              fontSize: '14px', 
+              cursor: 'pointer', 
+              boxShadow: viewMode === 'list' ? '0 4px 6px -1px rgba(37, 99, 235, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+              transition: 'all'
+            }}
+          >
+            최근 기록
+          </button>
+          <button 
+            onClick={() => setViewMode('monthly')}
+            style={{ 
+              padding: '12px 24px', 
+              backgroundColor: viewMode === 'monthly' ? '#2563EB' : '#FFFFFF', 
+              color: viewMode === 'monthly' ? '#FFFFFF' : '#475569', 
+              borderRadius: '16px', 
+              border: viewMode === 'monthly' ? 'none' : '1px solid #E2E8F0', 
+              fontWeight: 800, 
+              fontSize: '14px', 
+              cursor: 'pointer', 
+              boxShadow: viewMode === 'monthly' ? '0 4px 6px -1px rgba(37, 99, 235, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+              transition: 'all'
+            }}
+          >
+            월간 현황
+          </button>
+
+          {viewMode === 'list' && (
+            <div style={{ display: 'flex', gap: '4px', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '18px', marginLeft: '12px' }}>
+              <button 
+                onClick={() => setFilterMode('all')}
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: filterMode === 'all' ? '#FFFFFF' : 'transparent', 
+                  color: filterMode === 'all' ? '#0F172A' : '#64748B', 
+                  borderRadius: '14px', 
+                  border: 'none', 
+                  fontWeight: 800, 
+                  fontSize: '12px', 
+                  cursor: 'pointer',
+                  boxShadow: filterMode === 'all' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all'
+                }}
+              >
+                전체
+              </button>
+              <button 
+                onClick={() => setFilterMode('not_in')}
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: filterMode === 'not_in' ? '#FFFFFF' : 'transparent', 
+                  color: filterMode === 'not_in' ? '#EF4444' : '#64748B', 
+                  borderRadius: '14px', 
+                  border: 'none', 
+                  fontWeight: 800, 
+                  fontSize: '12px', 
+                  cursor: 'pointer',
+                  boxShadow: filterMode === 'not_in' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all'
+                }}
+              >
+                미등원
+              </button>
+              <button 
+                onClick={() => setFilterMode('not_out')}
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: filterMode === 'not_out' ? '#FFFFFF' : 'transparent', 
+                  color: filterMode === 'not_out' ? '#3B82F6' : '#64748B', 
+                  borderRadius: '14px', 
+                  border: 'none', 
+                  fontWeight: 800, 
+                  fontSize: '12px', 
+                  cursor: 'pointer',
+                  boxShadow: filterMode === 'not_out' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all'
+                }}
+              >
+                미하원
+              </button>
+            </div>
+          )}
+
+          {viewMode === 'monthly' && (
+            <input 
+              type="month" 
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor: '#FFFFFF', 
+                color: '#475569', 
+                borderRadius: '16px', 
+                border: '1px solid #E2E8F0', 
+                fontWeight: 800, 
+                fontSize: '14px', 
+                cursor: 'pointer', 
+                outline: 'none',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)'
+              }}
+            />
+          )}
+
+          {viewMode === 'list' && selectedIds.length > 0 && (
             <button 
               onClick={handleDeleteSelected}
-              style={{ padding: '12px 24px', backgroundColor: '#EF4444', color: '#FFFFFF', borderRadius: '16px', border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(239, 68, 68, 0.3)' }}
+              style={{ padding: '12px 24px', backgroundColor: '#FEE2E2', color: '#EF4444', borderRadius: '16px', border: '1px solid #FECACA', fontWeight: 800, fontSize: '14px', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}
             >
               선택 삭제 ({selectedIds.length})
             </button>
           )}
+          
+          {viewMode === 'monthly' && (
+            <button 
+              onClick={downloadMonthlyExcel}
+              style={{ padding: '12px 24px', backgroundColor: '#2563EB', borderRadius: '16px', border: 'none', fontWeight: 800, fontSize: '14px', color: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)', transition: 'all' }}
+            >
+              <Download size={16} /> 엑셀 다운로드
+            </button>
+          )}
+          
           <button 
-            onClick={fetchLogs}
-            style={{ padding: '12px 24px', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', fontWeight: 800, fontSize: '14px', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={viewMode === 'list' ? fetchLogs : fetchMonthlyLogs}
+            style={{ padding: '12px 24px', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', fontWeight: 800, fontSize: '14px', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}
           >
             <RefreshCw size={16} /> 새로고침
           </button>
         </div>
       </header>
 
-      <div className="bg-white rounded-3xl border border-[#E2E8F0] overflow-hidden shadow-sm">
-        <table className="w-full text-left">
-          <thead className="bg-[#F1F5F9] border-b border-[#E2E8F0]">
-            <tr>
-              <th className="p-5 w-16">
-                <input 
-                  type="checkbox" 
-                  className="w-5 h-5 rounded border-[#E2E8F0] cursor-pointer"
-                  checked={logs.length > 0 && selectedIds.length === logs.length}
-                  onChange={handleSelectAll}
-                />
-              </th>
-              <th className="p-5 text-sm font-bold text-[#475569]">ID</th>
-              <th className="p-5 text-sm font-bold text-[#475569]">날짜/시간</th>
-              <th className="p-5 text-sm font-bold text-[#475569]">이름</th>
-              <th className="p-5 text-sm font-bold text-[#475569]">구분</th>
-              <th className="p-5 text-sm font-bold text-[#475569]">상태</th>
-              <th className="p-5 text-sm font-bold text-[#475569] text-center">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="p-20 text-center text-[#94A3B8] animate-pulse">
-                  기록을 불러오는 중입니다...
-                </td>
-              </tr>
-            ) : logs.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="p-20 text-center text-[#94A3B8] italic">
-                  기록된 데이터가 없습니다.
-                </td>
-              </tr>
-            ) : (
-              logs.map((log) => (
-                <tr key={log.id} className={`border-b border-[#F1F5F9] hover:bg-gray-50 transition-colors ${selectedIds.includes(log.id) ? 'bg-blue-50/50' : ''}`}>
-                  <td className="p-5">
+      {viewMode === 'list' ? (
+        <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white">
+                  <th className="p-8 w-20">
                     <input 
                       type="checkbox" 
-                      className="w-5 h-5 rounded border-[#E2E8F0] cursor-pointer"
-                      checked={selectedIds.includes(log.id)}
-                      onChange={() => handleSelectOne(log.id)}
+                      className="w-5 h-5 rounded border-slate-200 cursor-pointer"
+                      checked={logs.length > 0 && selectedIds.length === logs.length}
+                      onChange={handleSelectAll}
                     />
-                  </td>
-                  <td className="p-5 text-[#64748B] text-sm">{log.id}</td>
-                  <td className="p-5 font-medium">
-                    {new Date(log.timestamp).toLocaleString('ko-KR')}
-                  </td>
-                  <td className="p-5 font-bold text-lg">{log.student_name}</td>
-                  <td className="p-5">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      log.type === 'IN' ? 'bg-[#DCFCE7] text-[#166534]' : 'bg-[#FEE2E2] text-[#991B1B]'
-                    }`}>
-                      {log.type === 'IN' ? '등원' : '하원'}
-                    </span>
-                  </td>
-                  <td className="p-5">
-                    <span className="text-[#64748B] text-sm font-medium">{log.status}</span>
-                  </td>
-                  <td className="p-5 text-center">
-                    <button
-                      onClick={() => handleDelete(log.id)}
-                      className="text-[#EF4444] hover:text-[#DC2626] text-sm font-bold transition-all p-2"
-                    >
-                      삭제
-                    </button>
-                  </td>
+                  </th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">ID</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">날짜/시간</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">관원 성함</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">구분</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">상태</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest text-center">문자 발송</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest text-center">관리</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="p-20 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-12 h-12 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p className="text-slate-400 font-black tracking-widest text-xs uppercase">LOADING LOGS...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (() => {
+                  const todayStr = new Date().toLocaleDateString('en-CA');
+                  let displayData = logs;
 
-      <footer className="mt-8 text-center text-[#94A3B8] text-sm">
-        최근 100건의 기록만 표시됩니다.
-      </footer>
+                  if (filterMode === 'not_in') {
+                    // 오늘 등원 기록이 없는 관원 필터링
+                    const checkInIds = new Set(logs.filter(l => l.timestamp.startsWith(todayStr) && l.type === 'IN').map(l => l.student_id));
+                    displayData = students.filter(s => !checkInIds.has(s.id)).map(s => ({
+                      id: 0,
+                      student_id: s.id,
+                      timestamp: todayStr,
+                      type: 'NOT_IN',
+                      status: '결석',
+                      student_name: s.name,
+                      parent_name: s.parent_name || '',
+                      parent_phone: s.parent_phone || '',
+                      class_name: classMap[s.class_id] || ''
+                    }));
+                  } else if (filterMode === 'not_out') {
+                    // 오늘 등원은 했지만 하원 기록이 없는 관원 필터링
+                    const checkInIds = new Set(logs.filter(l => l.timestamp.startsWith(todayStr) && l.type === 'IN').map(l => l.student_id));
+                    const checkOutIds = new Set(logs.filter(l => l.timestamp.startsWith(todayStr) && l.type === 'OUT').map(l => l.student_id));
+                    displayData = students
+                      .filter(s => checkInIds.has(s.id) && !checkOutIds.has(s.id))
+                      .map(s => {
+                        const inLog = logs.find(l => l.student_id === s.id && l.timestamp.startsWith(todayStr) && l.type === 'IN');
+                        return {
+                          id: inLog?.id || 0,
+                          student_id: s.id,
+                          timestamp: inLog?.timestamp || todayStr,
+                          type: 'NOT_OUT',
+                          status: '수련 중',
+                          student_name: s.name,
+                          parent_name: s.parent_name || '',
+                          parent_phone: s.parent_phone || '',
+                          class_name: classMap[s.class_id] || ''
+                        };
+                      });
+                  }
+
+                  const filtered = displayData.filter(log => 
+                    (log.student_name || '').includes(searchTerm) || 
+                    (log.parent_name || '').includes(searchTerm) || 
+                    (log.parent_phone || '').includes(searchTerm) ||
+                    (log.class_name || '').includes(searchTerm)
+                  );
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="p-20 text-center">
+                          <p className="text-xl font-black text-slate-300">해당하는 관원이 없습니다.</p>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map((log) => (
+                    <tr key={log.type === 'all' ? log.id : `${log.student_id}-${log.type}`} className={`group border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${selectedIds.includes(log.id) ? 'bg-blue-50/30' : ''}`}>
+                      <td className="p-8">
+                        <input 
+                          type="checkbox" 
+                          className="w-5 h-5 rounded border-slate-200 cursor-pointer"
+                          checked={selectedIds.includes(log.id)}
+                          onChange={() => handleSelectOne(log.id)}
+                          disabled={log.id === 0}
+                        />
+                      </td>
+                      <td className="p-8 text-slate-400 font-mono text-xs">{log.id === 0 ? '-' : log.id}</td>
+                      <td className="p-8">
+                        <p className="font-bold text-slate-700">{log.id === 0 ? '기록 없음' : new Date(log.timestamp).toLocaleDateString('ko-KR')}</p>
+                        <p className="text-xs font-medium text-slate-400">{log.id === 0 ? '-' : new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour12: false })}</p>
+                      </td>
+                      <td className="p-8 font-black text-slate-900 text-lg">{log.student_name}</td>
+                      <td className="p-8">
+                        <span style={{ 
+                          display: 'inline-block', 
+                          minWidth: '60px', 
+                          textAlign: 'center',
+                          padding: '8px 16px',
+                          borderRadius: '100px',
+                          fontSize: '11px',
+                          fontWeight: 900,
+                          letterSpacing: '0.05em',
+                          color: '#FFFFFF',
+                          backgroundColor: log.type === 'IN' ? '#10B981' : log.type === 'OUT' ? '#3B82F6' : log.type === 'NOT_IN' ? '#EF4444' : '#F59E0B',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          {log.type === 'IN' ? '등원' : log.type === 'OUT' ? '하원' : log.type === 'NOT_IN' ? '미등원' : '미하원'}
+                        </span>
+                      </td>
+                      <td className="p-8">
+                        <span className="text-slate-500 font-bold text-sm tracking-tight">
+                          {log.status === 'NORMAL' ? '정상' : log.status}
+                        </span>
+                      </td>
+                      <td className="p-8 text-center">
+                        {log.sms_status === 'SUCCESS' ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-black border border-green-100">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                            발송완료
+                          </span>
+                        ) : log.sms_status === 'FAILED' ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-50 text-red-600 text-[10px] font-black border border-red-100">
+                            발송실패
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-300">미발송</span>
+                        )}
+                      </td>
+                      <td className="p-8 text-center">
+                        {log.id !== 0 && (
+                          <button
+                            onClick={() => handleDelete(log.id)}
+                            style={{ 
+                              width: '40px', 
+                              height: '40px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              backgroundColor: '#FEF2F2', 
+                              color: '#EF4444', 
+                              borderRadius: '12px', 
+                              border: 'none', 
+                              cursor: 'pointer',
+                              margin: '0 auto',
+                              transition: 'all'
+                            }}
+                            className="opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white"
+                            title="기록 삭제"
+                          >
+                            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>✕</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col h-[70vh]">
+          <div className="flex-1 overflow-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse table-fixed min-w-[1100px]">
+              <thead className="sticky top-0 bg-white/90 backdrop-blur-md z-20 shadow-sm">
+                <tr>
+                  <th className="pl-4 pr-1 py-3 w-24 font-black text-[11px] text-slate-400 uppercase tracking-widest bg-white sticky left-0 z-30 border-b">관원 이름</th>
+                  <th className="pl-4 pr-1 py-3 w-24 font-black text-[11px] text-slate-400 uppercase tracking-widest bg-white sticky left-[96px] z-30 border-b">수련반</th>
+                  <th className="p-2 w-[60px] text-center font-black text-[11px] text-slate-400 uppercase tracking-widest bg-white sticky left-[192px] z-30 border-b">통계</th>
+                  {daysArray.map(day => {
+                    const date = new Date(year, month - 1, day);
+                    const dayOfWeek = date.getDay(); // 0: Sun, 6: Sat
+                    const isHoliday = [
+                      '01-01', '03-01', '05-05', '06-06', '08-15', '10-03', '10-09', '12-25'
+                    ].includes(`${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+                    
+                    let textColor = '#94A3B8';
+                    let bgColor = '';
+                    if (dayOfWeek === 6) {
+                      textColor = '#3B82F6';
+                      bgColor = 'bg-blue-50/30';
+                    }
+                    if (dayOfWeek === 0 || isHoliday) {
+                      textColor = '#EF4444';
+                      bgColor = 'bg-red-50/30';
+                    }
+
+                    return (
+                      <th key={day} className={`p-1 text-center border-b border-slate-50 ${bgColor}`}>
+                        <div style={{ color: textColor }} className="font-black text-[11px]">{day}</div>
+                        <div style={{ color: textColor, opacity: 0.5 }} className="text-[8px] font-medium">
+                          {['일','월','화','수','목','금','토'][dayOfWeek]}
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={daysInMonth + 3} className="p-40 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-12 h-12 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p className="text-slate-400 font-black tracking-widest text-xs uppercase">ANALYZING MONTHLY DATA...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : students.filter(s => 
+                    s.name.includes(searchTerm) || 
+                    (s.parent_name || '').includes(searchTerm) || 
+                    (s.parent_phone || '').includes(searchTerm) ||
+                    (classMap[s.class_id] || '').includes(searchTerm)
+                  ).length === 0 ? (
+                  <tr>
+                    <td colSpan={daysInMonth + 3} className="p-20 text-center">
+                      <p className="text-xl font-black text-slate-300">등록된 관원이 없습니다.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  students.filter(s => 
+                    s.name.includes(searchTerm) || 
+                    (s.parent_name || '').includes(searchTerm) || 
+                    (s.parent_phone || '').includes(searchTerm) ||
+                    (classMap[s.class_id] || '').includes(searchTerm)
+                  ).map(student => {
+                    const studentData = monthlyData[student.id] || {};
+                    const attendanceCount = Object.values(studentData).filter(logs => logs.includes('IN')).length;
+
+                    return (
+                      <tr key={student.id} className="hover:bg-blue-50/80 transition-colors border-b border-slate-50 group">
+                        <td className="pl-4 pr-1 py-3 font-black text-slate-900 sticky left-0 bg-white z-10 sticky-column">{student.name}</td>
+                        <td className="pl-4 pr-1 py-3 sticky left-[96px] bg-white z-10 sticky-column">
+                          <span className="text-[10px] font-bold text-blue-600">
+                            {classMap[student.class_id] || '미배정'}
+                          </span>
+                        </td>
+                        <td className="p-2 text-center sticky left-[192px] bg-white z-10 font-black text-sm sticky-column" style={{ color: '#10B981' }}>
+                          {attendanceCount}
+                        </td>
+                        {daysArray.map(day => {
+                          const date = new Date(year, month - 1, day);
+                          const today = new Date();
+                          const isToday = date.getFullYear() === today.getFullYear() && 
+                                          date.getMonth() === today.getMonth() && 
+                                          date.getDate() === today.getDate();
+                          const isFuture = date > today;
+                          
+                          const dayOfWeek = date.getDay();
+                          const isHoliday = [
+                            '01-01', '03-01', '05-05', '06-06', '08-15', '10-03', '10-09', '12-25'
+                          ].includes(`${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+
+                          let bgColor = '';
+                          if (isToday) bgColor = 'bg-yellow-50/50';
+                          else if (dayOfWeek === 6) bgColor = 'bg-blue-50/30';
+                          else if (dayOfWeek === 0 || isHoliday) bgColor = 'bg-red-50/30';
+
+                          const logs = studentData[day] || [];
+                          const hasIn = logs.includes('IN');
+
+                          return (
+                            <td key={day} className={`p-0.5 border-r border-slate-50 ${bgColor} transition-colors ${isToday ? 'ring-1 ring-inset ring-yellow-200/50' : ''}`}>
+                              <div className="flex items-center justify-center">
+                                {hasIn ? (
+                                  <span style={{ color: '#10B981' }} className="font-black text-sm">O</span>
+                                ) : isFuture ? (
+                                  <span className="text-slate-300 font-bold text-sm opacity-40">-</span>
+                                ) : (
+                                  <span style={{ color: '#EF4444' }} className="font-medium text-sm opacity-20">X</span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #F1F5F9;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #CBD5E1;
+          border-radius: 10px;
+          border: 2px solid #F1F5F9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94A3B8;
+        }
+        .sticky-column {
+          transition: all 0.2s;
+        }
+        tr:hover .sticky-column {
+          background-color: #EFF6FF !important;
+        }
+        tr:hover td {
+          background-color: #EFF6FF !important;
+          border-color: #DBEAFE !important;
+        }
+      `}</style>
     </div>
   );
 }

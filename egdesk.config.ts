@@ -1,6 +1,6 @@
 /**
  * EGDesk User Data Configuration
- * Generated at: 2026-05-14T10:03:52.591Z
+ * Generated at: 2026-05-15T14:02:22.862Z
  *
  * This file contains type-safe definitions for your EGDesk tables.
  */
@@ -22,48 +22,62 @@ export interface TableDefinition {
 
 export const TABLES = {
   table1: {
+    name: 'tkd_system_settings',
+    displayName: '태권도 시스템 설정',
+    rowCount: 5,
+    columnCount: 3,
+    columns: ['id', 'key', 'value']
+  } as TableDefinition,
+  table2: {
+    name: 'system_settings',
+    displayName: '시스템 설정',
+    rowCount: 0,
+    columnCount: 3,
+    columns: ['id', 'key', 'value']
+  } as TableDefinition,
+  table3: {
     name: 'student_classes',
     displayName: '반 관리',
     rowCount: 4,
     columnCount: 2,
     columns: ['id', 'name']
   } as TableDefinition,
-  table2: {
+  table4: {
     name: 'payment_records',
     displayName: '수납 기록',
     rowCount: 0,
     columnCount: 6,
     columns: ['id', 'student_id', 'amount', 'payment_date', 'depositor_name', 'status']
   } as TableDefinition,
-  table3: {
+  table5: {
     name: 'attendance_logs',
     displayName: '출결 기록',
     rowCount: 0,
     columnCount: 5,
     columns: ['id', 'student_id', 'timestamp', 'type', 'status']
   } as TableDefinition,
-  table4: {
+  table6: {
     name: 'students',
     displayName: '학생 명단',
-    rowCount: 1,
+    rowCount: 3,
     columnCount: 10,
     columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id']
   } as TableDefinition,
-  table5: {
+  table7: {
     name: 'classes',
     displayName: '수업 정보',
     rowCount: 0,
     columnCount: 4,
     columns: ['id', 'name', 'start_time', 'end_time']
   } as TableDefinition,
-  table6: {
+  table8: {
     name: 'custom_fields',
     displayName: '사용자 정의 항목',
     rowCount: 0,
     columnCount: 3,
     columns: ['id', 'field_name', 'display_name']
   } as TableDefinition,
-  table7: {
+  table9: {
     name: 'test_like',
     displayName: 'Test Table',
     rowCount: 1,
@@ -84,11 +98,13 @@ export function getTableByName(tableName: string): TableDefinition | undefined {
 
 // Export table names for easy access
 export const TABLE_NAMES = {
-  table1: 'student_classes',
-  table2: 'payment_records',
-  table3: 'attendance_logs',
-  table4: 'students',
-  table5: 'classes',
-  table6: 'custom_fields',
-  table7: 'test_like'
+  table1: 'tkd_system_settings',
+  table2: 'system_settings',
+  table3: 'student_classes',
+  table4: 'payment_records',
+  table5: 'attendance_logs',
+  table6: 'students',
+  table7: 'classes',
+  table8: 'custom_fields',
+  table9: 'test_like'
 } as const;

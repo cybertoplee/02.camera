@@ -13,7 +13,12 @@ import {
   CreditCard,
   ArrowRight
 } from 'lucide-react';
-import { queryTable, deleteRows, updateRows } from '@root/egdesk-helpers';
+import { 
+  getBankTransactionsAction, 
+  queryTableAction, 
+  updateRowsAction, 
+  deleteRowsAction 
+} from './actions';
 
 interface PaymentRecord {
   id: number;
@@ -38,30 +43,71 @@ export default function PaymentManagementPage() {
   const [filter, setFilter] = useState<'ALL' | 'MATCHED' | 'UNMATCHED'>('ALL');
   const [showMatchModal, setShowMatchModal] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeView, setActiveView] = useState<'RECORDS' | 'BANK'>('RECORDS');
+  const [bankTransactions, setBankTransactions] = useState<any[]>([]);
+  const [classMap, setClassMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetchData();
-  }, []);
+    if (activeView === 'BANK') {
+      fetchBankData();
+    }
+  }, [activeView]);
+
+  const fetchBankData = async () => {
+    setLoading(true);
+    try {
+      const res = await getBankTransactionsAction();
+      if (res.success) {
+        setBankTransactions(res.rows || []);
+      } else {
+        console.error('은행 거래 내역 로드 실패:', res.error);
+        alert('은행 데이터를 가져오는 데 실패했습니다: ' + res.error);
+      }
+    } catch (err) {
+      console.error('은행 거래 내역 로드 실패:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const studentsRes = await queryTable('students');
+      const classesRes = await queryTableAction('student_classes');
+      const cmap: Record<number, string> = {};
+      if (classesRes.success) {
+        classesRes.rows?.forEach((cls: any) => { cmap[cls.id] = cls.name; });
+        setClassMap(cmap);
+      }
+
+      const studentsRes = await queryTableAction('students');
+      if (!studentsRes.success) throw new Error(studentsRes.error);
+      
       const studentsList = studentsRes.rows || [];
       setStudents(studentsList);
-      const studentMap = new Map(studentsList.map((s: any) => [s.id, s.name]));
+      const studentMap = new Map(studentsList.map((s: any) => [s.id, s]));
 
-      const paymentsRes = await queryTable('payment_records', {
+      const paymentsRes = await queryTableAction('payment_records', {
         orderBy: 'payment_date',
         orderDirection: 'DESC'
       });
-      const payments = (paymentsRes.rows || []).map((p: any) => ({
-        ...p,
-        student_name: studentMap.get(p.student_id) || null
-      }));
+      if (!paymentsRes.success) throw new Error(paymentsRes.error);
+
+      const payments = (paymentsRes.rows || []).map((p: any) => {
+        const student = studentMap.get(p.student_id);
+        return {
+          ...p,
+          student_name: student?.name || null,
+          parent_name: student?.parent_name || '',
+          parent_phone: student?.parent_phone || '',
+          class_name: student ? (cmap[student.class_id] || '') : ''
+        };
+      });
       setRecords(payments);
-    } catch (err) {
+    } catch (err: any) {
       console.error('데이터 로드 실패:', err);
+      alert('데이터를 불러오는 중 오류가 발생했습니다: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -89,8 +135,12 @@ export default function PaymentManagementPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('이 수납 내역을 삭제하시겠습니까?')) return;
     try {
-      await deleteRows('payment_records', { ids: [id] });
-      setRecords(prev => prev.filter(r => r.id !== id));
+      const res = await deleteRowsAction('payment_records', { ids: [id] });
+      if (res.success) {
+        setRecords(prev => prev.filter(r => r.id !== id));
+      } else {
+        alert('삭제 실패: ' + res.error);
+      }
     } catch (err) {
       console.error('삭제 실패:', err);
     }
@@ -98,13 +148,18 @@ export default function PaymentManagementPage() {
 
   const handleManualMatch = async (recordId: number, studentId: number) => {
     try {
-      await updateRows('payment_records', {
+      const res = await updateRowsAction('payment_records', {
         student_id: studentId,
         status: 'MATCHED'
       }, { ids: [recordId] });
-      setShowMatchModal(null);
-      fetchData();
-      alert('성공적으로 매칭되었습니다.');
+      
+      if (res.success) {
+        setShowMatchModal(null);
+        fetchData();
+        alert('성공적으로 매칭되었습니다.');
+      } else {
+        alert('매칭 실패: ' + res.error);
+      }
     } catch (err) {
       console.error('매칭 실패:', err);
     }
@@ -112,7 +167,12 @@ export default function PaymentManagementPage() {
 
   const filteredRecords = records.filter(r => {
     const matchesFilter = filter === 'ALL' || r.status === filter;
-    const matchesSearch = r.depositor_name.includes(searchTerm) || (r.student_name && r.student_name.includes(searchTerm));
+    const matchesSearch = 
+      r.depositor_name.includes(searchTerm) || 
+      (r.student_name && r.student_name.includes(searchTerm)) ||
+      (r.parent_name && r.parent_name.includes(searchTerm)) ||
+      (r.parent_phone && r.parent_phone.includes(searchTerm)) ||
+      (r.class_name && r.class_name.includes(searchTerm));
     return matchesFilter && matchesSearch;
   });
 
@@ -124,6 +184,78 @@ export default function PaymentManagementPage() {
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* SEARCH BAR MOVED INSIDE HEADER */}
+          <div style={{ position: 'relative' }} className="group mr-2">
+            <Search 
+              size={16} 
+              style={{ 
+                position: 'absolute', 
+                left: '16px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                pointerEvents: 'none',
+                color: '#94A3B8'
+              }} 
+            />
+            <input 
+              type="text" 
+              placeholder="입금자명 또는 내용 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ 
+                padding: '12px 24px 12px 48px', 
+                backgroundColor: '#FFFFFF', 
+                color: '#475569', 
+                borderRadius: '16px', 
+                border: '1px solid #E2E8F0', 
+                fontWeight: 800, 
+                fontSize: '14px', 
+                width: '320px',
+                outline: 'none',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+                transition: 'all'
+              }}
+              className="focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5"
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginRight: '8px' }}>
+            <button 
+              onClick={() => setActiveView('RECORDS')}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor: activeView === 'RECORDS' ? '#2563EB' : '#FFFFFF', 
+                color: activeView === 'RECORDS' ? '#FFFFFF' : '#475569', 
+                borderRadius: '16px', 
+                border: activeView === 'RECORDS' ? 'none' : '1px solid #E2E8F0', 
+                fontWeight: 800, 
+                fontSize: '14px', 
+                cursor: 'pointer', 
+                boxShadow: activeView === 'RECORDS' ? '0 4px 6px -1px rgba(37, 99, 235, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+                transition: 'all'
+              }}
+            >
+              수납 내역 명부
+            </button>
+            <button 
+              onClick={() => setActiveView('BANK')}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor: activeView === 'BANK' ? '#2563EB' : '#FFFFFF', 
+                color: activeView === 'BANK' ? '#FFFFFF' : '#475569', 
+                borderRadius: '16px', 
+                border: activeView === 'BANK' ? 'none' : '1px solid #E2E8F0', 
+                fontWeight: 800, 
+                fontSize: '14px', 
+                cursor: 'pointer', 
+                boxShadow: activeView === 'BANK' ? '0 4px 6px -1px rgba(37, 99, 235, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+                transition: 'all'
+              }}
+            >
+              원본 은행 거래 내역
+            </button>
+          </div>
+
           <button 
             onClick={handleSync}
             disabled={syncing}
@@ -148,154 +280,154 @@ export default function PaymentManagementPage() {
         </div>
       </header>
 
-      {/* STATS AREA */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-[#E2E8F0] shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-            <CreditCard size={24} color="#3B82F6" />
-          </div>
-          <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">전체 내역</p>
-            <p className="text-2xl font-black text-slate-900">{records.length}건</p>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-[#E2E8F0] shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-            <CheckCircle2 size={24} color="#10B981" />
-          </div>
-          <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">매칭 완료</p>
-            <p className="text-2xl font-black text-emerald-600">{records.filter(r => r.status === 'MATCHED').length}건</p>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-[#E2E8F0] shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center">
-            <AlertCircle size={24} color="#F43F5E" />
-          </div>
-          <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">미확인 내역</p>
-            <p className="text-2xl font-black text-rose-600">{records.filter(r => r.status === 'UNMATCHED').length}건</p>
-          </div>
-        </div>
-      </div>
-
-      {/* FILTER & SEARCH */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="flex bg-white p-1 rounded-2xl border border-[#E2E8F0] w-full md:w-auto">
-          {(['ALL', 'MATCHED', 'UNMATCHED'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
-                filter === f ? 'bg-[#0F172A] text-white' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {f === 'ALL' ? '전체' : f === 'MATCHED' ? '매칭됨' : '미확인'}
-            </button>
-          ))}
-        </div>
-        <div className="relative w-full md:w-80">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="입금자명 또는 관원명 검색"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white border border-[#E2E8F0] rounded-2xl py-3 pl-12 pr-4 text-sm font-bold outline-none focus:border-blue-500 transition-all"
-          />
-        </div>
-      </div>
-
       {/* TABLE AREA */}
-      <div className="bg-white rounded-[40px] border border-[#E2E8F0] overflow-hidden shadow-sm">
-        <table className="w-full text-left">
-          <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-            <tr>
-              <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">일자</th>
-              <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">입금자명</th>
-              <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">매칭된 관원</th>
-              <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">금액</th>
-              <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">상태</th>
-              <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white overflow-hidden shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)]">
+        {activeView === 'RECORDS' ? (
+          <table className="w-full text-left">
+            <thead className="border-b border-slate-100">
               <tr>
-                <td colSpan={6} className="p-24 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-10 h-10 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
-                    <p className="text-slate-400 font-black text-xs tracking-widest">LOADING TRANSACTIONS...</p>
-                  </div>
-                </td>
+                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">일자</th>
+                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">입금자명</th>
+                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">매칭된 관원</th>
+                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">금액</th>
+                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">상태</th>
+                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">관리</th>
               </tr>
-            ) : filteredRecords.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-24 text-center text-slate-300 font-bold italic">
-                  표시할 내역이 없습니다.
-                </td>
-              </tr>
-            ) : (
-              filteredRecords.map((record) => (
-                <tr key={record.id} className="border-b border-[#F1F5F9] hover:bg-slate-50 transition-colors">
-                  <td className="p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
-                        <Calendar size={14} />
-                      </div>
-                      <span className="text-sm font-bold text-slate-600">{new Date(record.payment_date).toLocaleDateString()}</span>
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <span className="text-lg font-black text-slate-900">{record.depositor_name}</span>
-                  </td>
-                  <td className="p-6">
-                    {record.student_name ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-[10px] text-blue-600 font-black">ST</div>
-                        <span className="font-black text-slate-700">{record.student_name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-slate-300 text-sm font-bold">매칭 정보 없음</span>
-                    )}
-                  </td>
-                  <td className="p-6">
-                    <span className="text-lg font-black text-slate-900">{record.amount.toLocaleString()}원</span>
-                  </td>
-                  <td className="p-6">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      record.status === 'MATCHED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                    }`}>
-                      {record.status === 'MATCHED' ? (
-                        <><CheckCircle2 size={10} /> 완료</>
-                      ) : (
-                        <><AlertCircle size={10} /> 미확인</>
-                      )}
-                    </span>
-                  </td>
-                  <td className="p-6 text-center">
-                    <div className="flex justify-center gap-2">
-                      {record.status === 'UNMATCHED' && (
-                        <button 
-                          onClick={() => setShowMatchModal(record.id)}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[11px] hover:bg-blue-700 transition-all shadow-md active:scale-95"
-                        >
-                          관원 매칭
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => handleDelete(record.id)}
-                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="p-24 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-10 h-10 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
+                      <p className="text-slate-400 font-black text-xs tracking-widest">LOADING TRANSACTIONS...</p>
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-24 text-center text-slate-300 font-bold italic">
+                    표시할 내역이 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                filteredRecords.map((record) => (
+                  <tr key={record.id} className="border-b border-[#F1F5F9] hover:bg-slate-50 transition-colors">
+                    <td className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
+                          <Calendar size={14} />
+                        </div>
+                        <span className="text-sm font-bold text-slate-600">{new Date(record.payment_date).toLocaleDateString()}</span>
+                      </div>
+                    </td>
+                    <td className="p-6">
+                      <span className="text-lg font-black text-slate-900">{record.depositor_name}</span>
+                    </td>
+                    <td className="p-6">
+                      {record.student_name ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-[10px] text-blue-600 font-black">ST</div>
+                          <span className="font-black text-slate-700">{record.student_name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 text-sm font-bold">매칭 정보 없음</span>
+                      )}
+                    </td>
+                    <td className="p-6">
+                      <span className="text-lg font-black text-slate-900">{record.amount.toLocaleString()}원</span>
+                    </td>
+                    <td className="p-6">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        record.status === 'MATCHED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                      }`}>
+                        {record.status === 'MATCHED' ? (
+                          <><CheckCircle2 size={10} /> 완료</>
+                        ) : (
+                          <><AlertCircle size={10} /> 미확인</>
+                        )}
+                      </span>
+                    </td>
+                    <td className="p-6 text-center">
+                      <div className="flex justify-center gap-2">
+                        {record.status === 'UNMATCHED' && (
+                          <button 
+                            onClick={() => setShowMatchModal(record.id)}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[11px] hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                          >
+                            관원 매칭
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleDelete(record.id)}
+                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+              <tr>
+                <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">거래 일시</th>
+                <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">적요/내용</th>
+                <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">입금액</th>
+                <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">출금액</th>
+                <th className="p-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">잔액</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="p-24 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-10 h-10 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
+                      <p className="text-slate-400 font-black text-xs tracking-widest">FETCHING BANK DATA...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : bankTransactions.filter(t => (t.description || '').includes(searchTerm)).length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-24 text-center text-slate-300 font-bold italic">
+                    은행 거래 내역이 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                bankTransactions
+                  .filter(t => (t.description || '').includes(searchTerm))
+                  .map((t, idx) => (
+                  <tr key={idx} className="border-b border-[#F1F5F9] hover:bg-slate-50 transition-colors">
+                    <td className="p-6">
+                      <span className="text-sm font-bold text-slate-600">{new Date(t.date).toLocaleString()}</span>
+                    </td>
+                    <td className="p-6">
+                      <span className="text-lg font-black text-slate-900">{t.description}</span>
+                    </td>
+                    <td className="p-6">
+                      {t.type === 'deposit' ? (
+                        <span className="text-lg font-black text-emerald-600">+{t.amount.toLocaleString()}원</span>
+                      ) : '-'}
+                    </td>
+                    <td className="p-6">
+                      {t.type === 'withdrawal' ? (
+                        <span className="text-lg font-black text-rose-600">-{Math.abs(t.amount).toLocaleString()}원</span>
+                      ) : '-'}
+                    </td>
+                    <td className="p-6">
+                      <span className="text-sm font-bold text-slate-500">{t.balance?.toLocaleString() || '-'}원</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* MATCH MODAL */}

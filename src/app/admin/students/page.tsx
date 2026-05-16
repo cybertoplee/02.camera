@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, LayoutGrid, Table, Download, FileSpreadsheet, UploadCloud, Settings, RefreshCw, Inbox, User, ClipboardEdit, Lightbulb, Camera } from 'lucide-react';
+import { ArrowLeft, LayoutGrid, Table, Download, FileSpreadsheet, UploadCloud, Settings, RefreshCw, Inbox, User, ClipboardEdit, Lightbulb, Camera, Search } from 'lucide-react';
 import { queryTable, deleteRows, updateRows, insertRows, executeSQL } from '@root/egdesk-helpers';
 
 interface Student {
@@ -37,6 +37,7 @@ export default function StudentManagementPage() {
   const [newFieldName, setNewFieldName] = useState('');
   const [importData, setImportData] = useState<any[]>([]);
   const [editFormData, setEditFormData] = useState<any>({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Face Registration State
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -394,6 +395,39 @@ export default function StudentManagementPage() {
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ position: 'relative' }} className="group mr-2">
+            <Search 
+              size={16} 
+              style={{ 
+                position: 'absolute', 
+                left: '16px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                pointerEvents: 'none',
+                color: '#94A3B8'
+              }} 
+            />
+            <input 
+              type="text" 
+              placeholder="관원명 또는 연락처 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ 
+                padding: '12px 24px 12px 48px', 
+                backgroundColor: '#FFFFFF', 
+                color: '#475569', 
+                borderRadius: '16px', 
+                border: '1px solid #E2E8F0', 
+                fontWeight: 800, 
+                fontSize: '14px', 
+                width: '280px',
+                outline: 'none',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+                transition: 'all'
+              }}
+              className="focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5"
+            />
+          </div>
 
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowImportMenu(!showImportMenu)} style={{ padding: '12px 24px', backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', fontWeight: 800, fontSize: '14px', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -424,10 +458,15 @@ export default function StudentManagementPage() {
           <div className="w-16 h-16 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin"></div>
           <p className="text-slate-400 font-black tracking-widest text-sm">LOADING DATA...</p>
         </div>
-      ) : students.length === 0 ? (
+      ) : students.filter(s => 
+          s.name.includes(searchTerm) || 
+          (s.parent_name || '').includes(searchTerm) || 
+          (s.parent_phone || '').includes(searchTerm) ||
+          (classMap[s.class_id] || '').includes(searchTerm)
+        ).length === 0 ? (
         <div className="py-40 text-center bg-white/40 backdrop-blur-xl rounded-[48px] border-2 border-dashed border-white shadow-[0_8px_32px_rgba(0,0,0,0.02)]">
           <div className="flex justify-center mb-4"><Inbox size={48} strokeWidth={1} className="text-slate-400" /></div>
-          <p className="text-xl font-black text-slate-400">등록된 관원이 아직 없습니다.</p>
+          <p className="text-xl font-black text-slate-400">검색 결과가 없거나 등록된 관원이 없습니다.</p>
         </div>
       ) : (
         <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
@@ -445,7 +484,14 @@ export default function StudentManagementPage() {
                 </tr>
               </thead>
               <tbody>
-                {students.map((student) => (
+                {students
+                  .filter(s => 
+                    s.name.includes(searchTerm) || 
+                    (s.parent_name || '').includes(searchTerm) || 
+                    (s.parent_phone || '').includes(searchTerm) ||
+                    (classMap[s.class_id] || '').includes(searchTerm)
+                  )
+                  .map((student) => (
                   <tr key={student.id} className="group border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="p-8">
                       <div className="flex items-center gap-4">

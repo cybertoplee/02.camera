@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, User, TriangleAlert, CheckCircle, Loader2, MonitorPlay, UserPlus } from 'lucide-react';
 // import * as faceapi from '@vladmandic/face-api'; // 제거 후 useEffect 내 동적 임포트 사용
 import { queryTable, insertRows, aggregateTable, executeSQL } from '@root/egdesk-helpers';
+import { sendAttendanceSMSAction } from '../actions/sms';
 
 interface Student {
   id: number;
@@ -16,6 +17,7 @@ interface Student {
 interface AttendanceLog {
   name: string;
   time: string;
+  type: 'IN' | 'OUT';
 }
 
 export default function AttendanceMonitorPage() {
@@ -23,15 +25,19 @@ export default function AttendanceMonitorPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [todayCount, setTodayCount] = useState(0);
   const [recentLogs, setRecentLogs] = useState<AttendanceLog[]>([]);
-  const [matchedStudent, setMatchedStudent] = useState<Student | null>(null);
-  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [matchedStudents, setMatchedStudents] = useState<Array<{ 
+    student: Student; 
+    type: string; 
+    smsStatus?: 'SENDING' | 'SUCCESS' | 'FAILED' 
+  }>>([]);
+  const [autoCheckoutMinutes, setAutoCheckoutMinutes] = useState(10);
+  const [smsEnabled, setSmsEnabled] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const lastRecognizedId = useRef<number | null>(null);
-  const lastRecognizedTime = useRef<number>(0);
+  const recognitionCooldowns = useRef<Map<number, number>>(new Map());
   const lastDateRef = useRef<string>(new Date().toLocaleDateString('en-CA'));
 
   useEffect(() => {
@@ -68,8 +74,8 @@ export default function AttendanceMonitorPage() {
         
         // 2. Fetch today's counts and logs
         const [countData, logData] = await Promise.all([
-          executeSQL(`SELECT COUNT(*) as count FROM attendance_logs WHERE timestamp LIKE '${todayStr}%'`),
-          executeSQL(`SELECT student_id, timestamp FROM attendance_logs WHERE timestamp LIKE '${todayStr}%' ORDER BY timestamp DESC LIMIT 5`)
+          executeSQL(`SELECT COUNT(*) as count FROM attendance_logs WHERE timestamp LIKE '${todayStr}%' AND type = 'IN'`),
+          executeSQL(`SELECT student_id, timestamp, type FROM attendance_logs WHERE timestamp LIKE '${todayStr}%' ORDER BY timestamp DESC LIMIT 5`)
         ]);
 
         setTodayCount(countData.rows?.[0]?.count || 0);
@@ -78,9 +84,23 @@ export default function AttendanceMonitorPage() {
           const studentMap = new Map(studentData.rows.map((s: any) => [s.id, s.name]));
           const formattedLogs = logData.rows.map((l: any) => ({
             name: studentMap.get(l.student_id) || `ID: ${l.student_id}`,
-            time: new Date(l.timestamp).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            time: new Date(l.timestamp).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            type: l.type as 'IN' | 'OUT'
           }));
           setRecentLogs(formattedLogs);
+        }
+
+        // 3. Fetch system settings (Handle table not found error)
+        try {
+          const settingsData = await queryTable('tkd_system_settings');
+          if (settingsData && settingsData.rows) {
+            const checkout = settingsData.rows.find((s: any) => s.key === 'attendance_auto_checkout_minutes');
+            const smsOn = settingsData.rows.find((s: any) => s.key === 'sms_enabled');
+            if (checkout) setAutoCheckoutMinutes(Number(checkout.value));
+            if (smsOn) setSmsEnabled(smsOn.value === 'true' || smsOn.value === 'ON');
+          }
+        } catch (err) {
+          console.warn('tkd_system_settings 테이블을 찾을 수 없어 기본값을 사용합니다.');
         }
       } catch (err) {
         console.error('데이터 로드 실패:', err);
@@ -111,6 +131,16 @@ export default function AttendanceMonitorPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  const stopVideo = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const tracks = stream.getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      console.log('Webcam stream stopped');
+    }
+  };
 
   const startVideo = async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) return;
@@ -168,29 +198,21 @@ export default function AttendanceMonitorPage() {
           faceapi.matchDimensions(canvas, displaySize);
         }
 
-        // 탐지 시작
+        // 탐지 시작 (다중 얼굴 인식으로 변경)
         const detections = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.3 }))
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.3 }))
           .withFaceLandmarks()
-          .withFaceDescriptor();
+          .withFaceDescriptors();
 
         const ctx = canvas.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (detections) {
+        if (detections && detections.length > 0) {
+          const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
           const resizedDetections = faceapi.resizeResults(detections, displaySize);
           
-          if (ctx) {
-            const { x, y, width, height } = resizedDetections.detection.box;
-            
-            // 거울 모드 대응: X 좌표 반전
-            const mirroredX = displaySize.width - x - width;
-
-            // ctx.strokeStyle = '#3B82F6';
-            // ctx.lineWidth = 4;
-            // ctx.strokeRect(mirroredX, y, width, height);
-
-            const descriptor = detections.descriptor;
+          for (const detection of resizedDetections) {
+            const descriptor = detection.descriptor;
             let bestMatch = { student: null as Student | null, distance: 1.0 };
 
             for (const student of students) {
@@ -205,11 +227,7 @@ export default function AttendanceMonitorPage() {
             }
 
             if (bestMatch.student && bestMatch.distance < 0.6) {
-              // ctx.fillStyle = '#10B981';
-              // ctx.fillText(`${bestMatch.student.name} (${Math.round((1 - bestMatch.distance) * 100)}%)`, mirroredX, y - 15);
               handleRecognitionSuccess(bestMatch.student);
-            } else {
-              // ctx.fillText('인식 중...', mirroredX, y - 15);
             }
           }
         }
@@ -227,73 +245,111 @@ export default function AttendanceMonitorPage() {
   const handleRecognitionSuccess = async (student: Student) => {
     const now = Date.now();
     const todayStr = new Date().toLocaleDateString('en-CA');
+    const lastRecognized = recognitionCooldowns.current.get(student.id) || 0;
     
-    // 1. 아주 짧은 간격(5초) 연속 인식은 완전히 무시 (팝업 깜빡임 방지)
-    if (lastRecognizedId.current === student.id && now - lastRecognizedTime.current < 5000) {
+    // 1. 아주 짧은 간격(5초) 연속 인식은 완전히 무시
+    if (now - lastRecognized < 5000) {
       return;
     }
+    recognitionCooldowns.current.set(student.id, now);
 
-    // 2. 메모리 기반 중복 확인 (1시간 이내 재인식)
-    if (lastRecognizedId.current === student.id && now - lastRecognizedTime.current < 3600000) {
-      setMatchedStudent(student);
-      setIsDuplicate(true);
-      lastRecognizedTime.current = now; // 쿨다운 갱신
-      setTimeout(() => setMatchedStudent(null), 3000);
-      return;
-    }
+    let determinedType: 'IN' | 'OUT' | 'DUPLICATE' = 'IN';
 
-    // 3. DB 기반 중복 확인 (이미 오늘 등원했는지)
+    // 2. DB 기반 상태 확인 및 처리 (당일 마지막 기록 확인)
     try {
-      const existing = await executeSQL(`
-        SELECT COUNT(*) as total 
+      const lastLog = await executeSQL(`
+        SELECT type, timestamp 
         FROM attendance_logs 
         WHERE student_id = ${student.id} 
         AND timestamp LIKE '${todayStr}%'
+        ORDER BY id DESC
+        LIMIT 1
       `);
       
-      if (existing.rows?.[0]?.total > 0) {
-        setMatchedStudent(student);
-        setIsDuplicate(true);
-        lastRecognizedId.current = student.id;
-        lastRecognizedTime.current = now;
-        setTimeout(() => setMatchedStudent(null), 3000);
-        return;
+      const lastEntry = lastLog.rows?.[0];
+      
+      if (lastEntry) {
+        const lastTime = new Date(lastEntry.timestamp).getTime();
+        const diffMinutes = (now - lastTime) / (1000 * 60);
+
+        if (lastEntry.type === 'IN') {
+          if (diffMinutes < autoCheckoutMinutes) {
+            determinedType = 'DUPLICATE';
+          } else {
+            determinedType = 'OUT';
+            const localISO = new Date(now - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+            await insertRows('attendance_logs', [{
+              student_id: student.id,
+              timestamp: localISO,
+              type: 'OUT',
+              status: 'NORMAL'
+            }]);
+          }
+        } else if (lastEntry.type === 'OUT') {
+          determinedType = 'DUPLICATE';
+        }
+      } else {
+        // 신규 등원 처리
+        determinedType = 'IN';
+        const localISO = new Date(now - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+        await insertRows('attendance_logs', [{
+          student_id: student.id,
+          timestamp: localISO,
+          type: 'IN',
+          status: 'NORMAL'
+        }]);
       }
     } catch (err) {
-      console.error('중복 등원 확인 실패:', err);
+      console.error('출결 상태 확인 실패:', err);
+      return;
     }
 
-    // 4. 신규 등원 처리
-    setIsDuplicate(false);
-    lastRecognizedId.current = student.id;
-    lastRecognizedTime.current = now;
-    setMatchedStudent(student);
+    // UI 업데이트: 다중 팝업 지원 (팝업은 중복인 경우에도 알림을 위해 표시)
+    setMatchedStudents((prev) => [...prev, { student, type: determinedType }]);
+    
+    // 최근 기록 업데이트 (실제 등원/하원인 경우에만 추가)
+    if (determinedType !== 'DUPLICATE') {
+      setRecentLogs((prev) => [
+        { 
+          name: student.name, 
+          time: new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          type: determinedType
+        },
+        ...prev.slice(0, 4)
+      ]);
 
-    // DB에 출석 기록 저장 (시간 포함)
-    try {
-      const localISO = new Date(now - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
-      await insertRows('attendance_logs', [{
-        student_id: student.id,
-        timestamp: localISO,
-        type: 'IN',
-        status: 'NORMAL'
-      }]);
-    } catch (err) {
-      console.error('출석 저장 실패:', err);
+      // 오늘 등원 수 증가 (신규 등원인 경우에만)
+      if (determinedType === 'IN') {
+        setTodayCount((prev) => prev + 1);
+      }
+
+      // 학부모 알림 문자 발송 (설정된 경우)
+      if (smsEnabled) {
+        // 발송 중 상태 표시
+        setMatchedStudents(prev => prev.map(item => 
+          item.student.id === student.id ? { ...item, smsStatus: 'SENDING' } : item
+        ));
+
+        // 비동기 발송 및 결과 반영 (디버그 로그 추가)
+        console.log('[SMS] Calling server action for student:', student.id);
+        sendAttendanceSMSAction(student.id, determinedType).then(res => {
+          console.log('[SMS] Server action response:', res);
+          setMatchedStudents(prev => prev.map(item => 
+            item.student.id === student.id 
+              ? { ...item, smsStatus: res?.success ? 'SUCCESS' : 'FAILED' } 
+              : item
+          ));
+        }).catch(() => {
+          setMatchedStudents(prev => prev.map(item => 
+            item.student.id === student.id ? { ...item, smsStatus: 'FAILED' } : item
+          ));
+        });
+      }
     }
 
-    // 최근 기록 업데이트
-    setRecentLogs((prev) => [
-      { name: student.name, time: new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) },
-      ...prev.slice(0, 4)
-    ]);
-
-    // 오늘 등원 수 증가
-    setTodayCount((prev) => prev + 1);
-
-    // 팝업 닫기
+    // 3초 후 해당 학생 팝업 제거
     setTimeout(() => {
-      setMatchedStudent(null);
+      setMatchedStudents((prev) => prev.filter(s => s.student.id !== student.id));
     }, 3000);
   };
 
@@ -393,8 +449,10 @@ export default function AttendanceMonitorPage() {
           <div className="flex gap-6 overflow-x-auto pb-4 custom-scrollbar mask-fade-right">
             {recentLogs.map((log, i) => (
               <div key={i} className="flex-shrink-0 flex items-center gap-2 bg-white/5 backdrop-blur-xl pr-6 py-4 rounded-[28px] border-none shadow-none animate-in slide-in-from-left-8 duration-500">
-                <div className="w-10 h-10 bg-white/10 text-white rounded-xl flex items-center justify-center">
+                <div className={`w-10 h-10 ${log.type === 'OUT' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white'} rounded-xl flex items-center justify-center relative`}>
                   <User size={20} strokeWidth={2.5} />
+                  {/* Status Indicator Dot */}
+                  <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-950 ${log.type === 'OUT' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
                   <span style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1 }}>{log.name}</span>
@@ -412,41 +470,86 @@ export default function AttendanceMonitorPage() {
         </div>
       </div>
 
-      {/* Premium Success/Duplicate Popup */}
-      {matchedStudent && (
+      {/* Premium Success/Duplicate Popup - 다중 인원 지원 */}
+      {matchedStudents.length > 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none p-6">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-2xl animate-in fade-in duration-500"></div>
           
-          <div className="relative w-full max-w-4xl bg-transparent border-none shadow-none animate-in zoom-in-95 slide-in-from-bottom-20 duration-700">
-            
-            {/* Top Gloss Effect */}
-            <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-white/10 to-transparent"></div>
+          <div className="relative w-full max-w-5xl flex flex-col gap-6 items-center justify-center animate-in zoom-in-95 slide-in-from-bottom-20 duration-700">
+            {matchedStudents.map(({ student, type, smsStatus }, index) => (
+              <div 
+                key={student.id}
+                className="relative w-full bg-white/10 backdrop-blur-3xl rounded-[40px] overflow-hidden animate-in slide-in-from-bottom-10 duration-500 shadow-none border-none"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {/* Top Gloss Effect */}
+                <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent"></div>
 
-            <div className="relative z-10 flex flex-col items-center py-24 px-12 text-center gap-10">
-              {/* Icon Status */}
-              <div className="flex items-center justify-center text-white mb-4 animate-pulse">
-                {isDuplicate ? <TriangleAlert size={120} strokeWidth={1.5} /> : <CheckCircle size={120} strokeWidth={1.5} />}
-              </div>
-              
-              <div className="space-y-4">
-                <div className="text-2xl font-black uppercase tracking-[0.4em] text-white">
-                  {isDuplicate ? 'ALREADY CHECKED-IN' : 'WELCOME BACK'}
-                </div>
-                <div className="text-9xl font-black text-white tracking-tighter drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
-                  {matchedStudent.name}
-                </div>
-              </div>
-              
-              <div className="mt-4 px-12 py-6 border-none bg-transparent text-white">
-                <div className="text-3xl font-black tracking-tight">
-                  {isDuplicate ? '이미 오늘 등원 처리가 완료되었습니다.' : '정상적으로 등원 처리되었습니다!'}
-                </div>
-              </div>
+                <div className="relative z-10 flex flex-col items-center py-20 px-12 gap-10 text-center">
+                  {/* Icon Status */}
+                  <div className="flex-shrink-0 flex items-center justify-center text-white animate-pulse">
+                    {type === 'DUPLICATE' ? (
+                      <TriangleAlert size={100} strokeWidth={1.5} className="text-amber-500" />
+                    ) : type === 'OUT' ? (
+                      <CheckCircle size={100} strokeWidth={1.5} className="text-blue-500" />
+                    ) : (
+                      <CheckCircle size={100} strokeWidth={1.5} className="text-emerald-500" />
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-6">
+                    <div 
+                      className="text-9xl font-black text-white tracking-tighter leading-none"
+                      style={{ textShadow: 'none' }}
+                    >
+                      {student.name}
+                    </div>
+                    <div 
+                      className="text-4xl font-bold"
+                      style={{ 
+                        color: type === 'DUPLICATE' ? '#f59e0b' : '#ffffff',
+                        textShadow: 'none'
+                      }}
+                    >
+                      {type === 'DUPLICATE' 
+                        ? '이미 오늘 출결 처리가 완료되었습니다.' 
+                        : type === 'OUT' 
+                          ? '정상적으로 하원 처리되었습니다!' 
+                          : '정상적으로 등원 처리되었습니다!'}
+                    </div>
 
-              {/* Decorative side accents */}
-              <div className={`absolute top-1/2 left-0 w-2 h-40 -translate-y-1/2 rounded-r-full ${isDuplicate ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-              <div className={`absolute top-1/2 right-0 w-2 h-40 -translate-y-1/2 rounded-l-full ${isDuplicate ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-            </div>
+                    {/* 문자 발송 상태 표시 */}
+                    {(type === 'IN' || type === 'OUT') && (
+                      <div className="mt-8 flex items-center gap-4 px-8 py-4 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                        {(!smsStatus || smsStatus === 'SENDING') && (
+                          <>
+                            <Loader2 className="animate-spin text-blue-400" size={24} />
+                            <span className="text-2xl font-black text-blue-100">학부모님께 알림 문자 발송 중...</span>
+                          </>
+                        )}
+                        {smsStatus === 'SUCCESS' && (
+                          <>
+                            <CheckCircle className="text-emerald-500" size={24} />
+                            <span className="text-2xl font-black text-emerald-100">알림 문자 발송 완료 ✅</span>
+                          </>
+                        )}
+                        {smsStatus === 'FAILED' && (
+                          <>
+                            <TriangleAlert className="text-red-500" size={24} />
+                            <span className="text-2xl font-black text-red-100">문자 발송 실패 (기기 연결 확인 필요) ❌</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Decorative side accent - centered style */}
+                  <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-40 h-1.5 rounded-t-full ${
+                    type === 'DUPLICATE' ? 'bg-amber-500' : type === 'OUT' ? 'bg-blue-500' : 'bg-emerald-500'
+                  }`}></div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
