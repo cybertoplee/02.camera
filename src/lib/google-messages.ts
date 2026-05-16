@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 
 const STORAGE_PATH = path.join(process.cwd(), 'storage', 'google-messages-auth.json');
+const USER_DATA_DIR = path.join(process.cwd(), 'storage', 'playwright-profile');
 
 /**
  * Google 메시지 웹 자동화 클래스
@@ -17,15 +18,15 @@ export class GoogleMessagesAutomation {
    * 브라우저 초기화 및 세션 로드
    */
   async init(headless: boolean = true) {
-    // 기존 브라우저가 있지만 모드가 다른 경우 (예: headless -> headful) 닫고 다시 시작
-    if (this.browser && this.currentHeadless !== headless) {
+    // 기존 컨텍스트가 있지만 모드가 다른 경우 (예: headless -> headful) 닫고 다시 시작
+    if (this.context && this.currentHeadless !== headless) {
       await this.close();
     }
 
-    if (this.browser) {
+    if (this.context) {
       try {
-        // 브라우저가 연결되어 있고 페이지가 살아있는지 확인
-        if (this.browser.isConnected() && this.page && !this.page.isClosed()) {
+        // 컨텍스트가 연결되어 있고 페이지가 살아있는지 확인
+        if (this.page && !this.page.isClosed()) {
           return;
         }
         console.log('[GoogleMessages] 기존 브라우저 세션이 끊겼거나 페이지가 닫혔습니다. 재시작 중...');
@@ -59,25 +60,27 @@ export class GoogleMessagesAutomation {
 
     try {
       // 시스템에 설치된 실제 Chrome을 우선 사용 시도 (안정성 및 드라이버 호환성 매우 높음)
-      this.browser = await chromium.launch({ ...launchOptions, channel: 'chrome' });
-      console.log('[GoogleMessages] System Chrome 런칭 성공.');
+      this.context = await chromium.launchPersistentContext(USER_DATA_DIR, { 
+        ...launchOptions, 
+        channel: 'chrome',
+        viewport: { width: 1280, height: 800 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      });
+      console.log('[GoogleMessages] System Chrome 런칭 성공 (Persistent Context).');
     } catch (chromeErr: any) {
       console.log('[GoogleMessages] System Chrome 런칭 실패, 기본 Chromium으로 폴백합니다.', chromeErr.message);
-      this.browser = await chromium.launch(launchOptions);
+      this.context = await chromium.launchPersistentContext(USER_DATA_DIR, {
+        ...launchOptions,
+        viewport: { width: 1280, height: 800 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      });
     }
 
     this.currentHeadless = headless;
 
-    // 기존 세션이 있으면 로드
-    const storageState = fs.existsSync(STORAGE_PATH) ? STORAGE_PATH : undefined;
-    
-    this.context = await this.browser.newContext({
-      storageState,
-      viewport: { width: 1280, height: 800 },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-    });
-
-    this.page = await this.context.newPage();
+    // 첫 번째 빈 페이지 활용 또는 새 페이지 생성
+    const pages = this.context.pages();
+    this.page = pages.length > 0 ? pages[0] : await this.context.newPage();
     this.page.setDefaultTimeout(60000);
 
     // 메모리 절약을 위한 리소스 차단 (OOM 크래시 방지)
@@ -154,8 +157,7 @@ export class GoogleMessagesAutomation {
         throw new Error('연동 확인 시간이 초과되었습니다. 브라우저 창에서 QR 스캔을 완료했는지 확인해 주세요.');
       }
       
-      // 세션 저장
-      await this.context!.storageState({ path: STORAGE_PATH });
+      // Persistent context에서는 IndexedDB와 로컬스토리지가 자동 저장되므로 별도의 storageState 저장이 필요하지 않습니다.
       console.log('[GoogleMessages] 연동 성공 및 세션 저장 완료!');
       return { success: true };
     } catch (err: any) {
@@ -287,8 +289,8 @@ export class GoogleMessagesAutomation {
   }
 
   async close() {
-    if (this.browser) {
-      await this.browser.close();
+    if (this.context) {
+      await this.context.close();
       this.browser = null;
       this.context = null;
       this.page = null;
@@ -297,5 +299,11 @@ export class GoogleMessagesAutomation {
   }
 }
 
-// 싱글톤 인스턴스
-export const gmAutomation = new GoogleMessagesAutomation();
+// Next.js 개발 환경에서 Hot Reload 시 인스턴스가 여러 개 생성되어
+// 기존 브라우저 프로세스가 폴더 잠금을 유지하는 현상(EBUSY)을 방지하기 위한 글로벌 싱글톤 처리
+const globalForGM = globalThis as unknown as { gmAutomation: GoogleMessagesAutomation };
+export const gmAutomation = globalForGM.gmAutomation || new GoogleMessagesAutomation();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForGM.gmAutomation = gmAutomation;
+}

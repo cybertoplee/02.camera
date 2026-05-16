@@ -20,11 +20,14 @@ export default function StudentRegisterPage() {
     rank: '',
     memo: '',
     classId: '1',
+    receiveSmsIn: true,
+    receiveSmsOut: true,
   });
   const [classes, setClasses] = useState<{id: number, name: string}[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [status, setStatus] = useState('AI 모델 로딩 중...');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,6 +111,73 @@ export default function StudentRegisterPage() {
     setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
+  // Face Tracking Loop
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let isActive = true;
+
+    const trackFace = async () => {
+      if (!isModelLoaded || !videoRef.current || !canvasRef.current || isCapturing) {
+        if (isActive) timeoutId = setTimeout(trackFace, 150);
+        return;
+      }
+      
+      if (videoRef.current.readyState < 2) {
+        if (isActive) timeoutId = setTimeout(trackFace, 150);
+        return;
+      }
+
+      try {
+        const faceapi = await import('@vladmandic/face-api');
+        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions());
+        
+        const canvas = canvasRef.current;
+        if (canvas.width !== videoRef.current.videoWidth) {
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          if (detection) {
+            const { x, y, width, height } = detection.box;
+            
+            ctx.strokeStyle = '#3B82F6';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.roundRect(x, y, width, height, 16);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#3B82F6';
+            ctx.font = 'bold 24px sans-serif';
+            ctx.save();
+            // Flip text back because canvas is flipped horizontally
+            ctx.translate(x + width / 2, y - 10);
+            ctx.scale(-1, 1);
+            ctx.textAlign = 'center';
+            ctx.fillText('FACE DETECTED', 0, 0);
+            ctx.restore();
+          }
+        }
+      } catch (err) {}
+
+      if (isActive) {
+        timeoutId = setTimeout(trackFace, 150);
+      }
+    };
+
+    if (isModelLoaded) {
+      trackFace();
+    }
+
+    return () => {
+      isActive = false;
+      clearTimeout(timeoutId);
+    };
+  }, [isModelLoaded, isCapturing]);
+
   const handleRegister = async () => {
     if (!formData.name) {
       alert('학생 이름을 입력해주세요.');
@@ -121,8 +191,21 @@ export default function StudentRegisterPage() {
 
     try {
       const faceapi = await import('@vladmandic/face-api');
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const sw = canvas.width / zoom;
+        const sh = canvas.height / zoom;
+        const sx = (canvas.width - sw) / 2;
+        const sy = (canvas.height - sh) / 2;
+        ctx.drawImage(videoRef.current, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      }
+
       const detections = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -136,12 +219,7 @@ export default function StudentRegisterPage() {
       
       // Capture snapshot for profile image
       let profileImage = null;
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
         profileImage = canvas.toDataURL('image/jpeg', 0.7);
       }
 
@@ -156,7 +234,9 @@ export default function StudentRegisterPage() {
         memo: formData.memo,
         face_vector: faceVector,
         profile_image: profileImage,
-        class_id: parseInt(formData.classId)
+        class_id: parseInt(formData.classId),
+        receive_sms_in: formData.receiveSmsIn ? 'true' : 'false',
+        receive_sms_out: formData.receiveSmsOut ? 'true' : 'false'
       };
 
       customFields.forEach(field => {
@@ -190,7 +270,9 @@ export default function StudentRegisterPage() {
         birthDate: '',
         rank: '',
         memo: '',
-        classId: '1'
+        classId: '1',
+        receiveSmsIn: true,
+        receiveSmsOut: true
       };
       customFields.forEach(field => {
         resetData[field.field_name] = '';
@@ -260,6 +342,32 @@ export default function StudentRegisterPage() {
                 className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm"
                 placeholder="010-0000-0000"
               />
+            </div>
+
+            <div className="flex flex-col gap-2 group">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">알림 문자 설정</label>
+              <div className="flex gap-2">
+                <label className="flex-1 flex items-center justify-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 transition-all hover:bg-slate-100 cursor-pointer shadow-sm">
+                  <input
+                    type="checkbox"
+                    name="receiveSmsIn"
+                    checked={formData.receiveSmsIn}
+                    onChange={(e) => setFormData((prev: any) => ({ ...prev, receiveSmsIn: e.target.checked }))}
+                    className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="font-bold text-slate-700">등원 받기</span>
+                </label>
+                <label className="flex-1 flex items-center justify-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 transition-all hover:bg-slate-100 cursor-pointer shadow-sm">
+                  <input
+                    type="checkbox"
+                    name="receiveSmsOut"
+                    checked={formData.receiveSmsOut}
+                    onChange={(e) => setFormData((prev: any) => ({ ...prev, receiveSmsOut: e.target.checked }))}
+                    className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="font-bold text-slate-700">하원 받기</span>
+                </label>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 group">
@@ -334,15 +442,19 @@ export default function StudentRegisterPage() {
               </span>
             </div>
 
-            <div className="relative w-full aspect-video bg-black rounded-[32px] overflow-hidden border-2 border-slate-800 shadow-inner group mb-6">
+            <div className="relative w-full aspect-video bg-black rounded-[32px] overflow-hidden border-2 border-slate-800 shadow-inner group mb-4">
               <video
                 ref={videoRef}
                 autoPlay
                 muted
-                style={{ transform: 'scaleX(-1)' }}
-                className="w-full h-full object-cover opacity-90"
+                style={{ transform: `scaleX(-1) scale(${zoom})`, transformOrigin: 'center' }}
+                className="w-full h-full object-cover opacity-90 transition-transform duration-200"
               />
-              <canvas ref={canvasRef} style={{ transform: 'scaleX(-1)' }} className="absolute top-0 left-0" />
+              <canvas 
+                ref={canvasRef} 
+                style={{ transform: `scaleX(-1) scale(${zoom})`, transformOrigin: 'center' }} 
+                className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-200 pointer-events-none" 
+              />
               
               {isCapturing && (
                 <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-20">
@@ -358,6 +470,21 @@ export default function StudentRegisterPage() {
                   {status}
                 </p>
               </div>
+            </div>
+
+            {/* Zoom Slider */}
+            <div className="flex items-center gap-4 mb-6 bg-[#1E293B] p-4 rounded-2xl border border-white/5">
+              <span className="text-xs font-black text-slate-400">줌</span>
+              <input 
+                type="range" 
+                min="1" 
+                max="3" 
+                step="0.1" 
+                value={zoom} 
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                className="flex-1 accent-blue-500 cursor-pointer"
+              />
+              <span className="text-xs font-black text-blue-400 w-8 text-right">{zoom.toFixed(1)}x</span>
             </div>
 
             <button

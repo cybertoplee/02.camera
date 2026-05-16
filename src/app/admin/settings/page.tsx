@@ -38,6 +38,12 @@ export default function SettingsPage() {
     (apiKey !== '' && apiKey !== '********');
 
   useEffect(() => {
+    if (testStatus === '대기 중...' || testStatus === '문자 발송 가능' || testStatus === '문자 발송 불가') {
+      setTestStatus(smsEnabled ? '문자 발송 가능' : '문자 발송 불가');
+    }
+  }, [smsEnabled]);
+
+  useEffect(() => {
     // 현재 설정된 키가 있는지 확인 (보안상 마스킹된 상태로 가져오는 시뮬레이션)
     const fetchKey = async () => {
       try {

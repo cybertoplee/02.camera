@@ -31,6 +31,7 @@ export default function StudentManagementPage() {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [classMap, setClassMap] = useState<Record<number, string>>({});
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [zoom, setZoom] = useState(1);
   const [showFieldManager, setShowFieldManager] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
   const [showImportMenu, setShowImportMenu] = useState(false);
@@ -45,9 +46,11 @@ export default function StudentManagementPage() {
   const [faceStatus, setFaceStatus] = useState('');
   const [newFaceVector, setNewFaceVector] = useState<string | null>(null);
   const [newProfileImage, setNewProfileImage] = useState<string | null>(null);
-  const [pendingCapture, setPendingCapture] = useState<{ vector: string, image: string } | null>(null);
+  const [pendingCapture, setPendingCapture] = useState<{vector: string, image: string} | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -108,6 +111,73 @@ export default function StudentManagementPage() {
     }
   };
 
+  // Face Tracking Loop
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let isActive = true;
+
+    const trackFace = async () => {
+      // Run tracker only if editing, model is loaded, not capturing, and no pending capture
+      if (!editingStudent || !isModelLoaded || !videoRef.current || !canvasRef.current || isCapturing || pendingCapture || newProfileImage) {
+        if (isActive) timeoutId = setTimeout(trackFace, 150);
+        return;
+      }
+      
+      if (videoRef.current.readyState < 2) {
+        if (isActive) timeoutId = setTimeout(trackFace, 150);
+        return;
+      }
+
+      try {
+        const faceapi = await import('@vladmandic/face-api');
+        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions());
+        
+        const canvas = canvasRef.current;
+        if (canvas.width !== videoRef.current.videoWidth) {
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          if (detection) {
+            const { x, y, width, height } = detection.box;
+            
+            ctx.strokeStyle = '#3B82F6';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.roundRect(x, y, width, height, 16);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#3B82F6';
+            ctx.font = 'bold 24px sans-serif';
+            ctx.save();
+            ctx.translate(x + width / 2, y - 10);
+            ctx.scale(-1, 1);
+            ctx.textAlign = 'center';
+            ctx.fillText('FACE DETECTED', 0, 0);
+            ctx.restore();
+          }
+        }
+      } catch (err) {}
+
+      if (isActive) {
+        timeoutId = setTimeout(trackFace, 150);
+      }
+    };
+
+    if (isModelLoaded && editingStudent) {
+      trackFace();
+    }
+
+    return () => {
+      isActive = false;
+      clearTimeout(timeoutId);
+    };
+  }, [isModelLoaded, isCapturing, editingStudent, pendingCapture, newProfileImage]);
+
   const handleCaptureFace = async () => {
     if (!videoRef.current || !isModelLoaded) return;
     
@@ -122,8 +192,21 @@ export default function StudentManagementPage() {
 
     try {
       const faceapi = await import('@vladmandic/face-api');
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const sw = canvas.width / zoom;
+        const sh = canvas.height / zoom;
+        const sx = (canvas.width - sw) / 2;
+        const sy = (canvas.height - sh) / 2;
+        ctx.drawImage(videoRef.current, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      }
+
       const detections = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -135,12 +218,7 @@ export default function StudentManagementPage() {
       const vector = JSON.stringify(Array.from(detections.descriptor));
       
       // Capture snapshot for profile image
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
         const base64Image = canvas.toDataURL('image/jpeg', 0.7);
         setPendingCapture({ vector, image: base64Image });
         setFaceStatus('얼굴을 성공적으로 인식했습니다. 사진을 확인해 주세요.');
@@ -236,7 +314,9 @@ export default function StudentManagementPage() {
       birth_date: student.birth_date || '',
       rank: student.rank || '',
       memo: student.memo || '',
-      class_id: student.class_id || ''
+      class_id: student.class_id || '',
+      receive_sms_in: student.receive_sms_in !== 'false',
+      receive_sms_out: student.receive_sms_out !== 'false'
     };
     customFields.forEach(field => {
       initialData[field.field_name] = student[field.field_name] || '';
@@ -271,7 +351,12 @@ export default function StudentManagementPage() {
   const handleUpdate = async () => {
     if (!editingStudent || !editFormData.name.trim()) return;
     try {
-      const updateData = { ...editFormData };
+      const canEnableSms = !!(editingStudent?.face_vector || newFaceVector) && !!(editingStudent?.profile_image || newProfileImage);
+      const updateData = { 
+        ...editFormData,
+        receive_sms_in: (canEnableSms && editFormData.receive_sms_in) ? 'true' : 'false',
+        receive_sms_out: (canEnableSms && editFormData.receive_sms_out) ? 'true' : 'false'
+      };
       if (newFaceVector) {
         updateData.face_vector = newFaceVector;
       }
@@ -474,7 +559,7 @@ export default function StudentManagementPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white">
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">성함 / 상태</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">이름 / 알림설정</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">수련반</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">생년월일</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">보호자 정보</th>
@@ -510,7 +595,18 @@ export default function StudentManagementPage() {
                           <p className="font-black text-slate-900 text-lg">{student.name}</p>
                           <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter">{student.rank || '일반'}</p>
                         </div>
-                        {student.face_vector && <span className="bg-green-100 text-green-600 text-[9px] font-black px-2 py-0.5 rounded-full">AI OK</span>}
+                        <div className="flex flex-col gap-1.5 ml-3 border-l border-slate-100 pl-3">
+                          {student.receive_sms_in === 'true' && (
+                            <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', padding: '2px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', display: 'inline-block', textAlign: 'center' }}>
+                              등원 알림
+                            </span>
+                          )}
+                          {student.receive_sms_out === 'true' && (
+                            <span style={{ backgroundColor: '#FFF7ED', color: '#EA580C', border: '1px solid #FED7AA', padding: '2px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', display: 'inline-block', textAlign: 'center' }}>
+                              하원 알림
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="p-8 font-black text-blue-600">
@@ -712,6 +808,39 @@ export default function StudentManagementPage() {
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">학부모 연락처</label>
                   <input type="text" value={editFormData.parent_phone} onChange={(e) => setEditFormData({...editFormData, parent_phone: e.target.value})} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all" placeholder="010-0000-0000" />
                 </div>
+                {(() => {
+                  const canEnableSms = !!(editingStudent?.face_vector || newFaceVector) && !!(editingStudent?.profile_image || newProfileImage);
+                  return (
+                    <div className="flex flex-col gap-2 group">
+                      <label className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest ml-1">
+                        알림 문자 설정
+                        {!canEnableSms && <span className="text-red-400 text-[10px] normal-case tracking-normal">(사진 및 AI 등록 필요)</span>}
+                      </label>
+                      <div className="flex gap-2">
+                        <label className={`flex-1 flex items-center justify-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 transition-all shadow-sm h-[56px] box-border ${canEnableSms ? 'hover:bg-slate-100 cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                          <input
+                            type="checkbox"
+                            disabled={!canEnableSms}
+                            checked={canEnableSms && editFormData.receive_sms_in}
+                            onChange={(e) => setEditFormData({...editFormData, receive_sms_in: e.target.checked})}
+                            className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <span className="font-bold text-slate-700 text-sm whitespace-nowrap">등원 받기</span>
+                        </label>
+                        <label className={`flex-1 flex items-center justify-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 transition-all shadow-sm h-[56px] box-border ${canEnableSms ? 'hover:bg-slate-100 cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                          <input
+                            type="checkbox"
+                            disabled={!canEnableSms}
+                            checked={canEnableSms && editFormData.receive_sms_out}
+                            onChange={(e) => setEditFormData({...editFormData, receive_sms_out: e.target.checked})}
+                            className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <span className="font-bold text-slate-700 text-sm whitespace-nowrap">하원 받기</span>
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="flex flex-col gap-2 group">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">급/단</label>
                   <input type="text" value={editFormData.rank} onChange={(e) => setEditFormData({...editFormData, rank: e.target.value})} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all" />
@@ -756,10 +885,20 @@ export default function StudentManagementPage() {
                     muted 
                     playsInline 
                     style={{ 
-                      transform: 'scaleX(-1)', 
+                      transform: `scaleX(-1) scale(${zoom})`, 
+                      transformOrigin: 'center',
                       display: (pendingCapture || (newProfileImage && !isCapturing)) ? 'none' : 'block' 
                     }} 
-                    className="w-full h-full object-cover opacity-90" 
+                    className="w-full h-full object-cover opacity-90 transition-transform duration-200" 
+                  />
+                  <canvas 
+                    ref={canvasRef} 
+                    style={{ 
+                      transform: `scaleX(-1) scale(${zoom})`, 
+                      transformOrigin: 'center',
+                      display: (pendingCapture || (newProfileImage && !isCapturing)) ? 'none' : 'block' 
+                    }} 
+                    className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-200 pointer-events-none" 
                   />
                   {(pendingCapture || (newProfileImage && !isCapturing)) && (
                     <img src={pendingCapture ? pendingCapture.image : (newProfileImage || '')} className="w-full h-full object-cover" alt="Captured" />
@@ -774,6 +913,23 @@ export default function StudentManagementPage() {
                   )}
                   <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,1)] animate-scan z-10"></div>
                 </div>
+
+                {/* Zoom Slider */}
+                {(!pendingCapture && !(newProfileImage && !isCapturing)) && (
+                  <div className="flex items-center gap-4 bg-[#1E293B] p-4 rounded-2xl border border-white/5">
+                    <span className="text-xs font-black text-slate-400">줌</span>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="3" 
+                      step="0.1" 
+                      value={zoom} 
+                      onChange={(e) => setZoom(parseFloat(e.target.value))}
+                      className="flex-1 accent-blue-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-black text-blue-400 w-8 text-right">{zoom.toFixed(1)}x</span>
+                  </div>
+                )}
 
                 <div className="space-y-6">
                   {pendingCapture ? (

@@ -75,16 +75,18 @@ export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
     try {
       const lastLogRes = await executeSQL(`
         SELECT id FROM attendance_logs 
-        WHERE student_id = ${studentId} 
+        WHERE student_id = ${studentId} AND type = '${type}'
         ORDER BY timestamp DESC LIMIT 1
       `);
-      const todayStr = new Date().toISOString().split('T')[0];
       const status = result.success ? 'SUCCESS' : 'FAILED';
-      await updateRows('attendance_logs', 
-        { sms_status: status }, 
-        { filters: { student_id: String(studentId), timestamp: todayStr + '%', type: type } }
-      );
-      logToFile(`[DB 업데이트] 학생 ${studentId} (${type}) 상태: ${status}`);
+      
+      if (lastLogRes.rows && lastLogRes.rows.length > 0) {
+        const logId = lastLogRes.rows[0].id;
+        await updateRows('attendance_logs', { sms_status: status }, { ids: [logId] });
+        logToFile(`[DB 업데이트] 학생 ${studentId} (${type}) 상태: ${status} (logId: ${logId})`);
+      } else {
+        logToFile(`[DB 업데이트 경고] 학생 ${studentId}의 ${type} 출결 기록을 찾을 수 없습니다.`);
+      }
     } catch (dbErr: any) {
       logToFile(`[DB 업데이트 에러] ${dbErr.message}`);
     }

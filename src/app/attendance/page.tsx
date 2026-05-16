@@ -32,7 +32,17 @@ export default function AttendanceMonitorPage() {
   }>>([]);
   const [autoCheckoutMinutes, setAutoCheckoutMinutes] = useState(10);
   const [smsEnabled, setSmsEnabled] = useState(false);
+  const autoCheckoutMinutesRef = useRef(10);
+  const smsEnabledRef = useRef(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
+
+  useEffect(() => {
+    autoCheckoutMinutesRef.current = autoCheckoutMinutes;
+  }, [autoCheckoutMinutes]);
+
+  useEffect(() => {
+    smsEnabledRef.current = smsEnabled;
+  }, [smsEnabled]);
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -198,9 +208,9 @@ export default function AttendanceMonitorPage() {
           faceapi.matchDimensions(canvas, displaySize);
         }
 
-        // 탐지 시작 (다중 얼굴 인식으로 변경)
+        // 탐지 시작 (다중 얼굴 인식으로 변경, 임계값 상향 조정하여 오인식 방지)
         const detections = await faceapi
-          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.3 }))
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.5 }))
           .withFaceLandmarks()
           .withFaceDescriptors();
 
@@ -226,7 +236,7 @@ export default function AttendanceMonitorPage() {
               } catch (e) {}
             }
 
-            if (bestMatch.student && bestMatch.distance < 0.6) {
+            if (bestMatch.student && bestMatch.distance < 0.5) {
               handleRecognitionSuccess(bestMatch.student);
             }
           }
@@ -273,7 +283,7 @@ export default function AttendanceMonitorPage() {
         const diffMinutes = (now - lastTime) / (1000 * 60);
 
         if (lastEntry.type === 'IN') {
-          if (diffMinutes < autoCheckoutMinutes) {
+          if (diffMinutes < autoCheckoutMinutesRef.current) {
             determinedType = 'DUPLICATE';
           } else {
             determinedType = 'OUT';
@@ -282,7 +292,8 @@ export default function AttendanceMonitorPage() {
               student_id: student.id,
               timestamp: localISO,
               type: 'OUT',
-              status: 'NORMAL'
+              status: 'NORMAL',
+              sms_status: (smsEnabledRef.current && student.receive_sms_out !== 'false') ? 'SENDING' : 'NONE'
             }]);
           }
         } else if (lastEntry.type === 'OUT') {
@@ -296,7 +307,8 @@ export default function AttendanceMonitorPage() {
           student_id: student.id,
           timestamp: localISO,
           type: 'IN',
-          status: 'NORMAL'
+          status: 'NORMAL',
+          sms_status: (smsEnabledRef.current && student.receive_sms_in !== 'false') ? 'SENDING' : 'NONE'
         }]);
       }
     } catch (err) {
@@ -323,8 +335,8 @@ export default function AttendanceMonitorPage() {
         setTodayCount((prev) => prev + 1);
       }
 
-      // 학부모 알림 문자 발송 (설정된 경우)
-      if (smsEnabled) {
+      // 학부모 알림 문자 발송 (설정된 경우 & 관원이 해당 타입 수신 동의한 경우)
+      if (smsEnabledRef.current && ((determinedType === 'IN' && student.receive_sms_in !== 'false') || (determinedType === 'OUT' && student.receive_sms_out !== 'false'))) {
         // 발송 중 상태 표시
         setMatchedStudents(prev => prev.map(item => 
           item.student.id === student.id ? { ...item, smsStatus: 'SENDING' } : item

@@ -53,15 +53,15 @@ export const TABLES = {
     name: 'attendance_logs',
     displayName: '출결 기록',
     rowCount: 0,
-    columnCount: 5,
-    columns: ['id', 'student_id', 'timestamp', 'type', 'status']
+    columnCount: 6,
+    columns: ['id', 'student_id', 'timestamp', 'type', 'status', 'sms_status']
   } as TableDefinition,
   table6: {
     name: 'students',
     displayName: '학생 명단',
     rowCount: 3,
     columnCount: 10,
-    columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id']
+    columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id', 'receive_sms_in', 'receive_sms_out']
   } as TableDefinition,
   table7: {
     name: 'classes',

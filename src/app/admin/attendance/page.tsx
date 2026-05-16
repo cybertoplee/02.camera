@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import { RefreshCw, Download, Search } from 'lucide-react';
-import { queryTable, deleteRows } from '@root/egdesk-helpers';
+import { queryTable, deleteRows, executeSQL } from '@root/egdesk-helpers';
 
 interface AttendanceLog {
   id: number;
@@ -12,7 +12,7 @@ interface AttendanceLog {
   timestamp: string;
   type: string;
   status: string;
-  sms_status?: 'NONE' | 'SUCCESS' | 'FAILED';
+  sms_status?: 'NONE' | 'SENDING' | 'SUCCESS' | 'FAILED';
   student_name?: string;
 }
 
@@ -83,11 +83,13 @@ export default function AttendanceManagementPage() {
       const studentMap = new Map((studentsRes.rows || []).map((s: any) => [s.id, s]));
       setStudents(studentsRes.rows || []);
 
-      const logsRes = await queryTable('attendance_logs', {
-        limit: 100,
-        orderBy: 'id',
-        orderDirection: 'DESC'
-      });
+      const todayStr = new Date().toLocaleDateString('en-CA');
+
+      const logsRes = await executeSQL(`
+        SELECT * FROM attendance_logs 
+        WHERE timestamp LIKE '${todayStr}%' 
+        ORDER BY id DESC
+      `);
 
       const formattedLogs = (logsRes.rows || []).map((log: any) => {
         const student = studentMap.get(log.student_id);
@@ -427,6 +429,7 @@ export default function AttendanceManagementPage() {
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">ID</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">날짜/시간</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">관원 성함</th>
+                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">수련반</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">구분</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">상태</th>
                   <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest text-center">문자 발송</th>
@@ -518,6 +521,11 @@ export default function AttendanceManagementPage() {
                       </td>
                       <td className="p-8 font-black text-slate-900 text-lg">{log.student_name}</td>
                       <td className="p-8">
+                        <span className="bg-blue-50 text-blue-600 font-black text-xs px-3 py-1 rounded-lg border border-blue-100">
+                          {log.class_name || '미배정'}
+                        </span>
+                      </td>
+                      <td className="p-8">
                         <span style={{ 
                           display: 'inline-block', 
                           minWidth: '60px', 
@@ -544,6 +552,11 @@ export default function AttendanceManagementPage() {
                           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-black border border-green-100">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                             발송완료
+                          </span>
+                        ) : log.sms_status === 'SENDING' ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-[10px] font-black border border-blue-100">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                            발송중
                           </span>
                         ) : log.sms_status === 'FAILED' ? (
                           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-50 text-red-600 text-[10px] font-black border border-red-100">
