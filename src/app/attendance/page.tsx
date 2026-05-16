@@ -387,25 +387,25 @@ export default function AttendanceMonitorPage() {
       )}
 
       {/* UI Overlay */}
-      <div className="absolute inset-0 flex flex-col justify-between p-16 pointer-events-none z-20">
+      <div className="absolute inset-0 flex flex-col justify-between p-6 md:p-16 pointer-events-none z-20">
         {/* Top Bar - Glassmorphism */}
-        <div className="flex justify-between items-start">
-          <div className="flex flex-col items-start gap-1">
-            <div className="text-2xl font-bold text-white tracking-tight">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div className="flex flex-col items-start gap-0.5">
+            <div className="text-lg md:text-2xl font-bold text-white tracking-tight opacity-80">
               {currentDate}
             </div>
-            <div className="text-8xl md:text-9xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.2)] tracking-tighter tabular-nums">
+            <div className="text-6xl md:text-9xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.2)] tracking-tighter tabular-nums leading-none">
               {currentTime}
             </div>
           </div>
           
-          <div className="flex flex-col items-end gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end gap-2 md:gap-4 w-full md:w-auto">
+            <div className="hidden md:flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto no-scrollbar">
               <Link
                 href="/admin/students/register"
-                className="pointer-events-auto bg-slate-900/80 hover:bg-slate-900 text-white px-8 py-4 rounded-full border border-white/20 backdrop-blur-md transition-all font-bold shadow-2xl hover:shadow-white/10 active:scale-95 flex items-center gap-3 no-underline"
+                className="pointer-events-auto bg-slate-900/80 hover:bg-slate-900 text-white px-5 py-3 md:px-8 md:py-4 rounded-full border border-white/20 backdrop-blur-md transition-all text-xs md:text-base font-bold shadow-2xl active:scale-95 flex items-center gap-2 no-underline whitespace-nowrap"
               >
-                <UserPlus size={20} strokeWidth={2.5} /> <span>신규 등록</span>
+                <UserPlus className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} /> <span>신규 등록</span>
               </Link>
 
               <button 
@@ -416,63 +416,62 @@ export default function AttendanceMonitorPage() {
                     document.exitFullscreen();
                   }
                 }}
-                className="pointer-events-auto bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-full border border-white/20 backdrop-blur-md transition-all font-bold shadow-lg hover:shadow-white/10 active:scale-95 flex items-center gap-3"
+                className="pointer-events-auto bg-white/10 hover:bg-white/20 text-white px-5 py-3 md:px-8 md:py-4 rounded-full border border-white/20 backdrop-blur-md transition-all text-xs md:text-base font-bold shadow-lg active:scale-95 flex items-center gap-2 whitespace-nowrap"
               >
-                <MonitorPlay size={20} strokeWidth={2.5} /> <span>전체 화면 모드</span>
+                <MonitorPlay className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} /> <span>전체 화면</span>
               </button>
             </div>
             
             {!isModelLoaded && (
-              <div className="flex items-center gap-4 bg-blue-500/20 backdrop-blur-md px-8 py-4 rounded-full border border-blue-500/30">
-                <div className="w-3 h-3 bg-blue-400 rounded-full animate-ping" />
-                <span className="text-xl font-black text-blue-50 tracking-wide">AI 시스템 초기화 중...</span>
+              <div className="flex items-center gap-3 md:gap-4 bg-blue-500/20 backdrop-blur-md px-5 py-3 md:px-8 md:py-4 rounded-full border border-blue-500/30 w-full md:w-auto">
+                <div className="w-2 h-2 md:w-3 md:h-3 bg-blue-400 rounded-full animate-ping" />
+                <span className="text-sm md:text-xl font-black text-blue-50 tracking-wide">AI 시스템 초기화 중...</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Center Target Guide - Futuristic */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[500px] pointer-events-none">
+        {/* Center Target Guide - Futuristic Responsive */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] h-[350px] md:w-[400px] md:h-[500px] pointer-events-none">
           {/* Corner Brackets */}
-          <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-blue-500/50 rounded-tl-3xl"></div>
-          <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-blue-500/50 rounded-tr-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-blue-500/50 rounded-bl-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-blue-500/50 rounded-br-3xl"></div>
+          <div className="absolute top-0 left-0 w-12 h-12 md:w-16 md:h-16 border-t-4 border-l-4 border-blue-500/50 rounded-tl-3xl"></div>
+          <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 border-t-4 border-r-4 border-blue-500/50 rounded-tr-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-12 h-12 md:w-16 md:h-16 border-b-4 border-l-4 border-blue-500/50 rounded-bl-3xl"></div>
+          <div className="absolute bottom-0 right-0 w-12 h-12 md:w-16 md:h-16 border-b-4 border-r-4 border-blue-500/50 rounded-br-3xl"></div>
           {/* Crosshair */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 opacity-30">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 md:w-8 md:h-8 opacity-30">
             <div className="absolute top-1/2 left-0 w-full h-[2px] bg-blue-500 -translate-y-1/2"></div>
             <div className="absolute top-0 left-1/2 w-[2px] h-full bg-blue-500 -translate-x-1/2"></div>
           </div>
         </div>
 
         {/* Bottom Logs - Glassmorphism Cards */}
-        <div className="flex flex-col gap-6 max-w-full overflow-hidden">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 flex items-center justify-center">
-              <span className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
+        <div className="flex flex-col gap-4 md:gap-6 max-w-full overflow-hidden">
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
+              <span className="w-2 h-2 md:w-2.5 md:h-2.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '20px', marginBottom: '-5px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.2em', lineHeight: 1, paddingBottom: '12px', margin: 0 }}>오늘 등원</h2>
-              <span style={{ fontSize: '80px', fontWeight: 900, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.02em' }}>{todayCount}</span>
+            <div className="flex items-baseline gap-3 md:gap-5 mb-[-2px] md:mb-[-5px]">
+              <h2 className="text-sm md:text-xl font-black text-white uppercase tracking-[0.2em] leading-none pb-2 md:pb-3 m-0">오늘 등원</h2>
+              <span className="text-5xl md:text-8xl font-black text-white leading-none tracking-tighter">{todayCount}</span>
             </div>
           </div>
-          <div className="flex gap-6 overflow-x-auto pb-4 custom-scrollbar mask-fade-right">
+          <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 no-scrollbar mask-fade-right">
             {recentLogs.map((log, i) => (
-              <div key={i} className="flex-shrink-0 flex items-center gap-2 bg-white/5 backdrop-blur-xl pr-6 py-4 rounded-[28px] border-none shadow-none animate-in slide-in-from-left-8 duration-500">
-                <div className={`w-10 h-10 ${log.type === 'OUT' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white'} rounded-xl flex items-center justify-center relative`}>
-                  <User size={20} strokeWidth={2.5} />
-                  {/* Status Indicator Dot */}
-                  <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-950 ${log.type === 'OUT' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
+              <div key={i} className="flex-shrink-0 flex items-center gap-2 bg-white/5 backdrop-blur-xl px-4 md:pr-6 py-3 md:py-4 rounded-[20px] md:rounded-[28px] border-none shadow-none animate-in slide-in-from-left-8 duration-500">
+                <div className={`w-8 h-8 md:w-10 md:h-10 ${log.type === 'OUT' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white'} rounded-lg md:rounded-xl flex items-center justify-center relative shrink-0`}>
+                  <User className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
+                  <div className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${log.type === 'OUT' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
-                  <span style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1 }}>{log.name}</span>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', letterSpacing: '0.05em', lineHeight: 1, paddingBottom: '2px' }}>{log.time}</span>
+                <div className="flex items-baseline gap-2 md:gap-3">
+                  <span className="text-lg md:text-2xl font-black text-white tracking-tight leading-none whitespace-nowrap">{log.name}</span>
+                  <span className="text-[10px] md:text-14 font-bold text-white/60 tracking-wider leading-none">{log.time}</span>
                 </div>
               </div>
             ))}
             {recentLogs.length === 0 && (
-              <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 p-6 rounded-[24px] text-white/50 text-sm font-bold tracking-widest flex items-center gap-3">
-                <Loader2 className="animate-spin text-white/50" size={16} strokeWidth={3} />
+              <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 px-5 py-3 md:p-6 rounded-[20px] md:rounded-[24px] text-white/50 text-[10px] md:text-sm font-bold tracking-widest flex items-center gap-2 md:gap-3">
+                <Loader2 className="animate-spin text-white/50 w-3.5 h-3.5 md:w-4 md:h-4" strokeWidth={3} />
                 AWAITING FIRST STUDENT...
               </div>
             )}
@@ -480,45 +479,39 @@ export default function AttendanceMonitorPage() {
         </div>
       </div>
 
-      {/* Premium Success/Duplicate Popup - 다중 인원 지원 */}
+      {/* Premium Success/Duplicate Popup - Responsive */}
       {matchedStudents.length > 0 && (
-        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none p-6">
+        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none p-4 md:p-6">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-2xl animate-in fade-in duration-500"></div>
           
-          <div className="relative w-full max-w-5xl flex flex-col gap-6 items-center justify-center animate-in zoom-in-95 slide-in-from-bottom-20 duration-700">
+          <div className="relative w-full max-w-lg md:max-w-5xl flex flex-col gap-4 md:gap-6 items-center justify-center animate-in zoom-in-95 slide-in-from-bottom-20 duration-700">
             {matchedStudents.map(({ student, type, smsStatus }, index) => (
               <div 
                 key={student.id}
-                className="relative w-full bg-white/10 backdrop-blur-3xl rounded-[40px] overflow-hidden animate-in slide-in-from-bottom-10 duration-500 shadow-none border-none"
+                className="relative w-full bg-white/10 backdrop-blur-3xl rounded-[30px] md:rounded-[40px] overflow-hidden animate-in slide-in-from-bottom-10 duration-500 shadow-none border-none"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                {/* Top Gloss Effect */}
                 <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent"></div>
 
-                <div className="relative z-10 flex flex-col items-center py-20 px-12 gap-10 text-center">
-                  {/* Icon Status */}
+                <div className="relative z-10 flex flex-col items-center py-12 md:py-20 px-6 md:px-12 gap-6 md:gap-10 text-center">
                   <div className="flex-shrink-0 flex items-center justify-center text-white animate-pulse">
                     {type === 'DUPLICATE' ? (
-                      <TriangleAlert size={100} strokeWidth={1.5} className="text-amber-500" />
+                      <TriangleAlert className="w-[60px] h-[60px] md:w-[100px] md:h-[100px] text-amber-500" strokeWidth={1.5} />
                     ) : type === 'OUT' ? (
-                      <CheckCircle size={100} strokeWidth={1.5} className="text-blue-500" />
+                      <CheckCircle className="w-[60px] h-[60px] md:w-[100px] md:h-[100px] text-blue-500" strokeWidth={1.5} />
                     ) : (
-                      <CheckCircle size={100} strokeWidth={1.5} className="text-emerald-500" />
+                      <CheckCircle className="w-[60px] h-[60px] md:w-[100px] md:h-[100px] text-emerald-500" strokeWidth={1.5} />
                     )}
                   </div>
                   
-                  <div className="flex flex-col items-center gap-6">
-                    <div 
-                      className="text-9xl font-black text-white tracking-tighter leading-none"
-                      style={{ textShadow: 'none' }}
-                    >
+                  <div className="flex flex-col items-center gap-4 md:gap-6">
+                    <div className="text-6xl md:text-9xl font-black text-white tracking-tighter leading-none">
                       {student.name}
                     </div>
                     <div 
-                      className="text-4xl font-bold"
+                      className="text-xl md:text-4xl font-bold px-4"
                       style={{ 
                         color: type === 'DUPLICATE' ? '#f59e0b' : '#ffffff',
-                        textShadow: 'none'
                       }}
                     >
                       {type === 'DUPLICATE' 
@@ -528,33 +521,31 @@ export default function AttendanceMonitorPage() {
                           : '정상적으로 등원 처리되었습니다!'}
                     </div>
 
-                    {/* 문자 발송 상태 표시 */}
                     {(type === 'IN' || type === 'OUT') && (
-                      <div className="mt-8 flex items-center gap-4 px-8 py-4 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                      <div className="mt-4 md:mt-8 flex items-center gap-3 md:gap-4 px-5 py-3 md:px-8 md:py-4 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
                         {(!smsStatus || smsStatus === 'SENDING') && (
                           <>
-                            <Loader2 className="animate-spin text-blue-400" size={24} />
-                            <span className="text-2xl font-black text-blue-100">학부모님께 알림 문자 발송 중...</span>
+                            <Loader2 className="animate-spin text-blue-400 w-[18px] h-[18px] md:w-6 md:h-6" />
+                            <span className="text-sm md:text-2xl font-black text-blue-100">알림 문자 발송 중...</span>
                           </>
                         )}
                         {smsStatus === 'SUCCESS' && (
                           <>
-                            <CheckCircle className="text-emerald-500" size={24} />
-                            <span className="text-2xl font-black text-emerald-100">알림 문자 발송 완료 ✅</span>
+                            <CheckCircle className="text-emerald-500 w-[18px] h-[18px] md:w-6 md:h-6" />
+                            <span className="text-sm md:text-2xl font-black text-emerald-100">알림 문자 발송 완료 ✅</span>
                           </>
                         )}
                         {smsStatus === 'FAILED' && (
                           <>
-                            <TriangleAlert className="text-red-500" size={24} />
-                            <span className="text-2xl font-black text-red-100">문자 발송 실패 (기기 연결 확인 필요) ❌</span>
+                            <TriangleAlert className="text-red-500 w-[18px] h-[18px] md:w-6 md:h-6" />
+                            <span className="text-sm md:text-2xl font-black text-red-100">발송 실패 (연결 확인 필요) ❌</span>
                           </>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* Decorative side accent - centered style */}
-                  <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-40 h-1.5 rounded-t-full ${
+                  <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-24 md:w-40 h-1 md:h-1.5 rounded-t-full ${
                     type === 'DUPLICATE' ? 'bg-amber-500' : type === 'OUT' ? 'bg-blue-500' : 'bg-emerald-500'
                   }`}></div>
                 </div>

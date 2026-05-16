@@ -51,15 +51,34 @@ export default function ClientStudents({ initialStudents, error }: { initialStud
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 pt-safe pb-24">
-      <header className="bg-white/80 backdrop-blur-xl px-4 py-3 sticky top-0 z-10 shadow-sm border-b border-slate-200/50">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">관원 목록</h1>
-          <Link href="/m/students/register" className="bg-blue-600 text-white p-2.5 rounded-2xl shadow-lg shadow-blue-600/20 active:scale-90 transition-transform">
-            <Plus size={24} strokeWidth={3} />
+      <header className="bg-white/80 backdrop-blur-xl px-5 pt-4 pb-3 sticky top-0 z-10 shadow-sm border-b border-slate-200/50">
+        <div className="flex justify-between items-center mb-3">
+          <h1 className="text-xl font-black text-slate-900 tracking-tight shrink-0">관원 목록</h1>
+          
+          <Link href="/m/students/register" className="flex items-center gap-1.5 px-3.5 py-2.5 bg-blue-600 text-white rounded-xl text-[10.5px] font-black shadow-lg shadow-blue-600/20 active:scale-95 transition-transform leading-none">
+            <Plus size={14} strokeWidth={4} />
+            등록
           </Link>
         </div>
 
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl mb-4">
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            placeholder="이름 또는 연락처 검색"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-12 py-2 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+          />
+          <button 
+            onClick={startListening}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${isListening ? 'bg-red-100 text-red-500 shadow-sm animate-pulse' : 'bg-slate-200 text-slate-400'}`}
+          >
+            {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+          </button>
+        </div>
+
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl">
           {[
             { id: 'ACTIVE', label: '재원' },
             { id: 'ON_HOLD', label: '휴관' },
@@ -68,7 +87,7 @@ export default function ClientStudents({ initialStudents, error }: { initialStud
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id as any)}
-              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
+              className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 statusFilter === tab.id 
                   ? 'bg-white text-blue-600 shadow-sm' 
                   : 'text-slate-500'
@@ -77,23 +96,6 @@ export default function ClientStudents({ initialStudents, error }: { initialStud
               {tab.label}
             </button>
           ))}
-        </div>
-
-        <div className="relative group">
-          <input
-            type="text"
-            placeholder="이름 또는 연락처 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-100/80 border-none rounded-2xl py-3.5 pl-11 pr-12 text-base font-medium focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
-          />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <button 
-            onClick={startListening}
-            className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-colors ${isListening ? 'bg-red-100 text-red-500' : 'bg-slate-200/50 text-slate-500'}`}
-          >
-            <Mic size={18} className={isListening ? 'animate-pulse' : ''} />
-          </button>
         </div>
       </header>
 

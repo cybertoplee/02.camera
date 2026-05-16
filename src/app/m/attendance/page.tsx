@@ -8,10 +8,13 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
-export default async function MobileAttendancePage() {
+export default async function MobileAttendancePage({ searchParams }: { searchParams: Promise<{ mode?: string, month?: string, year?: string }> }) {
   noStore();
+  const sp = await searchParams;
+  const mode = sp.mode || 'daily';
   let formattedLogs = [];
   let allStudents = [];
+  let queryDatePattern = '';
   let error = null;
 
   try {
@@ -24,35 +27,52 @@ export default async function MobileAttendancePage() {
     }
 
     const studentsRes = await queryTable('students');
-    allStudents = studentsRes?.rows || [];
+    allStudents = (studentsRes?.rows || []).map((s: any) => ({
+      ...s,
+      class_name: cmap[s.class_id] || ''
+    }));
     const studentMap = new Map<number, any>(allStudents.map((s: any) => [s.id, s]));
 
     const today = new Date();
-    // Use local time instead of UTC to avoid timezone issues.
-    // For Korea, UTC+9.
-    const tzOffset = 9 * 60 * 60000;
-    const localDate = new Date(today.getTime() + tzOffset);
-    const todayStr = `${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth() + 1).padStart(2, '0')}-${String(localDate.getUTCDate()).padStart(2, '0')}`;
+    const tzOffset = 9 * 60 * 60000; // Korea
+    const localToday = new Date(today.getTime() + tzOffset);
+    
+    queryDatePattern = '';
+    if (mode === 'monthly') {
+      const year = sp.year || localToday.getUTCFullYear().toString();
+      const month = sp.month || String(localToday.getUTCMonth() + 1).padStart(2, '0');
+      queryDatePattern = `${year}-${month}`;
+    } else {
+      queryDatePattern = `${localToday.getUTCFullYear()}-${String(localToday.getUTCMonth() + 1).padStart(2, '0')}-${String(localToday.getUTCDate()).padStart(2, '0')}`;
+    }
 
     const logsRes = await executeSQL(`
       SELECT * FROM attendance_logs 
-      WHERE timestamp LIKE '${todayStr}%' 
+      WHERE timestamp LIKE '${queryDatePattern}%' 
       ORDER BY id DESC
     `);
-
-    formattedLogs = (logsRes?.rows || []).map((log: any) => {
+    const logs = logsRes?.rows || [];
+    
+    formattedLogs = logs.map((log: any) => {
       const student = studentMap.get(log.student_id);
       return {
         ...log,
         student_name: student?.name || `ID: ${log.student_id}`,
-        class_name: student ? (cmap[student.class_id] || '') : '',
-        parent_phone: student?.parent_phone || ''
+        class_name: student?.class_name || '',
+        parent_phone: student?.parent_phone || '',
+        profile_image: student?.profile_image || null
       };
     });
 
-    if (!logsRes?.rows) {
-      console.error('DEBUG: logsRes.rows is undefined! logsRes is:', logsRes);
-      error = '디버그: logsRes.rows가 없습니다.';
+    // In monthly mode, we only want to show students who are ACTIVE or had at least one log in this month
+    if (mode === 'monthly') {
+      const attendedIds = new Set(formattedLogs.map(l => l.student_id));
+      allStudents = allStudents.filter(s => (s.status === 'ACTIVE' || !s.status) || attendedIds.has(s.id));
+    }
+
+    // Sort by id DESC for daily view
+    if (mode === 'daily') {
+      formattedLogs.sort((a: any, b: any) => b.id - a.id);
     }
 
   } catch (err: any) {
@@ -60,5 +80,5 @@ export default async function MobileAttendancePage() {
     error = '데이터를 불러오는 중 오류가 발생했습니다.';
   }
 
-  return <ClientAttendanceLogs initialLogs={formattedLogs} allStudents={allStudents} error={error} />;
+  return <ClientAttendanceLogs key={`${mode}-${queryDatePattern}`} initialLogs={formattedLogs} allStudents={allStudents} error={error} />;
 }
