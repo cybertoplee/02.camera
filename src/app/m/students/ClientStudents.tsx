@@ -113,12 +113,12 @@ export default function ClientStudents({ initialStudents, error }: { initialStud
               onClick={() => handleCardClick(student.id)}
               key={student.id} 
               className={`bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex justify-between items-center animate-in fade-in slide-in-from-bottom-2 duration-300 active:bg-slate-50 cursor-pointer transition-all relative overflow-hidden ${
-                student.status !== 'ACTIVE' ? 'opacity-70 grayscale-[0.5]' : ''
+                (student.status && student.status !== 'ACTIVE') ? 'opacity-70 grayscale-[0.5]' : ''
               }`}
             >
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-50 text-blue-600 rounded-full flex items-center justify-center font-black text-lg shadow-inner overflow-hidden ${
-                  student.status !== 'ACTIVE' ? 'from-slate-200 to-slate-100 text-slate-400' : ''
+                  (student.status && student.status !== 'ACTIVE') ? 'from-slate-200 to-slate-100 text-slate-400' : ''
                 }`}>
                   {student.profile_image ? (
                     <img src={student.profile_image} alt={student.name} className="w-full h-full object-cover" />
