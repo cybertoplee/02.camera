@@ -283,6 +283,13 @@ export default function AttendanceMonitorPage() {
               status: 'NORMAL',
               sms_status: (smsEnabledRef.current && student.receive_sms_out !== 'false') ? 'SENDING' : 'NONE'
             }]);
+            
+            // 과금용 사용량 통계 로깅 (얼굴 인식 건수 증가)
+            await insertRows('tkd_usage_logs', [{
+              type: 'FACE',
+              timestamp: localISO,
+              student_id: student.id
+            }]).catch(e => console.warn('사용량 로깅 실패:', e));
           }
         } else if (lastEntry.type === 'OUT') {
           determinedType = 'DUPLICATE';
@@ -298,6 +305,13 @@ export default function AttendanceMonitorPage() {
           status: 'NORMAL',
           sms_status: (smsEnabledRef.current && student.receive_sms_in !== 'false') ? 'SENDING' : 'NONE'
         }]);
+
+        // 과금용 사용량 통계 로깅 (얼굴 인식 건수 증가)
+        await insertRows('tkd_usage_logs', [{
+          type: 'FACE',
+          timestamp: localISO,
+          student_id: student.id
+        }]).catch(e => console.warn('사용량 로깅 실패:', e));
       }
     } catch (err) {
       console.error('출결 상태 확인 실패:', err);

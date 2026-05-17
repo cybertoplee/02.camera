@@ -484,7 +484,6 @@ export default function StudentManagementPage() {
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div style={{ display: 'flex', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '16px' }}>
             {[
               { id: 'ACTIVE', label: '재원생' },

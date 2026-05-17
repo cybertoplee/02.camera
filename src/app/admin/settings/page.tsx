@@ -7,8 +7,8 @@ import { queryTable, insertRows, deleteRows, createTable } from '@root/egdesk-he
 import { sendAttendanceSMSAction } from '../../actions/sms';
 
 export default function SettingsPage() {
-  const [apiKey, setApiKey] = useState('');
   const [status, setStatus] = useState('');
+  const [usageStats, setUsageStats] = useState({ faceCount: 0, smsCount: 0, currentMonth: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [testStudentId, setTestStudentId] = useState('1');
   const [testStatus, setTestStatus] = useState('대기 중...');
@@ -34,8 +34,7 @@ export default function SettingsPage() {
     attendanceAutoCheckoutMinutes !== initialSettings.attendanceAutoCheckoutMinutes ||
     smsEnabled !== initialSettings.smsEnabled ||
     smsTemplateIn !== initialSettings.smsTemplateIn ||
-    smsTemplateOut !== initialSettings.smsTemplateOut ||
-    (apiKey !== '' && apiKey !== '********');
+    smsTemplateOut !== initialSettings.smsTemplateOut;
 
   useEffect(() => {
     if (testStatus === '대기 중...' || testStatus === '문자 발송 가능' || testStatus === '문자 발송 불가') {
@@ -44,21 +43,26 @@ export default function SettingsPage() {
   }, [smsEnabled]);
 
   useEffect(() => {
-    // 현재 설정된 키가 있는지 확인 (보안상 마스킹된 상태로 가져오는 시뮬레이션)
-    const fetchKey = async () => {
+    const fetchUsageStats = async () => {
       try {
-        const res = await fetch('/api/settings/ai-key');
+        const res = await fetch('/api/settings/usage');
         const data = await res.json();
-        if (data.exists) {
-          setApiKey('********'); // 마스킹 처리
+        if (data.success) {
+          setUsageStats({ faceCount: data.faceCount, smsCount: data.smsCount, currentMonth: data.currentMonth });
         }
       } catch (err) {
-        console.error('키 로드 실패:', err);
+        console.error('통계 로드 실패:', err);
       }
     };
-    fetchKey();
+    fetchUsageStats();
+    
+    // 5초마다 실시간으로 갱신
+    const interval = setInterval(fetchUsageStats, 5000);
+
     fetchClasses();
     fetchSystemSettings();
+    
+    return () => clearInterval(interval);
   }, []);
 
   const fetchSystemSettings = async () => {
@@ -187,21 +191,7 @@ export default function SettingsPage() {
     setStatus('저장 중...');
 
     try {
-      // 1. API 키 저장 (사용자가 수정한 경우에만)
-      if (apiKey && apiKey !== '********') {
-        const res = await fetch('/api/settings/ai-key', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey }),
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(`AI 키 저장 실패: ${errorData.error || res.statusText}`);
-        }
-      }
-
-      // 2. 시스템 설정 저장 (tkd_system_settings)
+      // 1. 시스템 설정 저장 (tkd_system_settings)
       try {
         await insertRows('tkd_system_settings', [
           { key: 'attendance_refresh_interval', value: String(attendanceRefreshInterval) },
@@ -270,34 +260,50 @@ export default function SettingsPage() {
 
       <main className="max-w-3xl flex flex-col gap-1 relative z-10">
         <div className="bg-white/80 backdrop-blur-xl p-8 md:p-12 rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden relative">
-          {/* Top Right Decoration */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-slate-100 text-slate-800 rounded-2xl flex items-center justify-center shadow-inner border border-slate-200">
-              <Bot size={24} strokeWidth={2} />
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-slate-100 text-slate-800 rounded-2xl flex items-center justify-center shadow-inner border border-slate-200">
+                <Bot size={24} strokeWidth={2} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">이번 달 서비스 사용 통계</h2>
+                <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{usageStats.currentMonth || '로딩 중...'} 기준</p>
+              </div>
             </div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Google Gemini API 설정</h2>
+            
+            <a
+              href={`/api/settings/usage/download?month=${usageStats.currentMonth || ''}`}
+              className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors border border-indigo-100 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              엑셀로 다운로드
+            </a>
           </div>
           
-          <p className="text-slate-500 font-medium leading-relaxed mb-8 bg-slate-50 p-6 rounded-[24px] border border-slate-100">
-            수납 내역 자동 매칭 및 데이터 분석에 사용되는 <strong className="text-slate-700">Google Generative AI API 키</strong>입니다.<br/>
-            키 발급이 필요하다면 아래 링크를 통해 발급받으실 수 있습니다.
-            <br />
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" className="inline-flex items-center gap-2 mt-3 text-blue-600 font-black hover:text-blue-700 hover:underline transition-all">
-              Google AI Studio에서 키 발급받기 <span className="text-sm">↗</span>
-            </a>
-          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-50/80 p-8 rounded-[32px] border border-slate-100 flex flex-col justify-between group hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 relative overflow-hidden">
+              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors"></div>
+              <div className="relative z-10">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-6">얼굴 인식 출결 건수</label>
+                <div className="flex items-end gap-3">
+                  <span className="text-5xl font-black text-slate-800 tracking-tighter leading-none">{usageStats.faceCount.toLocaleString()}</span>
+                  <span className="text-sm font-bold text-slate-400 mb-1">건</span>
+                </div>
+              </div>
+            </div>
 
-          <div className="flex flex-col gap-3 group">
-            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">Gemini API Key</label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="AI API 키를 입력하세요 (AIzaSy...)"
-              className="w-full bg-slate-50 border-2 border-slate-200 rounded-[20px] px-8 py-6 font-mono text-lg text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm"
-            />
+            <div className="bg-slate-50/80 p-8 rounded-[32px] border border-slate-100 flex flex-col justify-between group hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 relative overflow-hidden">
+              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors"></div>
+              <div className="relative z-10">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-6">알림 문자 발송 건수</label>
+                <div className="flex items-end gap-3">
+                  <span className="text-5xl font-black text-slate-800 tracking-tighter leading-none">{usageStats.smsCount.toLocaleString()}</span>
+                  <span className="text-sm font-bold text-slate-400 mb-1">건</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

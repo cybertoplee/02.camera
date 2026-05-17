@@ -191,7 +191,16 @@ export async function sendAttendanceSMSBatch(requests: { studentId: number, type
           await updateRows('attendance_logs', { sms_status: status }, { ids: [lastLogRes.rows[0].id] });
         }
 
-        if (result.success) successCount++;
+        if (result.success) {
+          successCount++;
+          // 과금용 사용량 통계 로깅 (문자 발송 건수 증가)
+          const localISO = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+          await insertRows('tkd_usage_logs', [{
+            type: 'SMS',
+            timestamp: localISO,
+            student_id: studentId
+          }]).catch(e => logToFile(`[사용량 로깅 에러] ${e.message}`));
+        }
         
         // 연속 발송 사이 짧은 대기 (안정성)
         await new Promise(resolve => setTimeout(resolve, 1000));
