@@ -173,115 +173,64 @@ export class GoogleMessagesAutomation {
    */
   async sendSMS(phoneNumber: string, message: string) {
     try {
-      if (!this.page) await this.init(true);
+      if (!this.page || this.page.isClosed()) await this.init(true);
       
-      console.log(`[GoogleMessages] 메시지 발송 프로세스 시작: ${phoneNumber}`);
+      console.log(`[GoogleMessages] 메시지 발송 시작: ${phoneNumber}`);
 
       // 치명적 오류 확인 헬퍼
       const isFatal = (err: any) => err?.message?.includes('closed') || err?.message?.includes('crash') || err?.message?.includes('navigation');
 
-      // 1. '채팅 시작' / '대화 시작' 버튼 대기 및 클릭
+      // 1. '채팅 시작' / '대화 시작' 버튼 탐색 (실패 및 지연이 발생하는 동작이므로 주석 처리)
+      /*
       try {
-        // 구글 메시지 업데이트로 인해 버튼 텍스트가 '채팅 시작'으로 변경됨을 반영
-        const startChatButton = await this.page!.locator('text="채팅 시작", text="대화 시작", text="Start chat"').first();
-        await startChatButton.waitFor({ state: 'visible', timeout: 15000 });
-        await this.page!.waitForTimeout(500);
-        await startChatButton.click({ timeout: 5000 }); // force: true 제거하여 정상 작동하는 버튼만 클릭
+        const startChatButton = this.page!.locator('button:has-text("시작"), a:has-text("시작"), [aria-label*="시작"], .fab-container button').first();
+        await startChatButton.waitFor({ state: 'visible', timeout: 3000 });
+        await startChatButton.click({ timeout: 2000 });
       } catch (e: any) {
         if (isFatal(e)) throw e;
-        
-        console.log('[GoogleMessages] 기본 버튼 클릭 실패, 강제 텍스트 매칭 탐색 시도...');
-        try {
-          if (!this.page || this.page.isClosed()) throw new Error('Target closed');
-          const btn = await this.page.locator('button:has-text("시작"), a:has-text("시작")').first();
-          if (await btn.isVisible()) {
-             await btn.click();
-          } else {
-             throw new Error('버튼을 찾을 수 없음');
-          }
-        } catch (innerErr: any) {
-          if (isFatal(innerErr)) throw innerErr;
-          console.log('[GoogleMessages] 텍스트 기반 클릭도 실패, 엔터키 진행 시도');
-          if (this.page && !this.page.isClosed()) {
-            await this.page.keyboard.press('Enter');
-          }
-        }
+        await this.page!.keyboard.press('Enter');
       }
+      */
+      // 버튼 클릭 대신 즉시 엔터 또는 단축키로 진입 시도 (속도 개선)
+      await this.page!.keyboard.press('Enter');
       
-      // 2. 전화번호 입력창 대기 및 입력
-      let searchInput;
-      try {
-        searchInput = await this.page!.waitForSelector(
-          'input[placeholder*="이름"], input[placeholder*="번호"], input[aria-label*="전화번호"], .contact-picker-input input',
-          { timeout: 10000 }
-        );
-      } catch (e) {
-        // 만약 특정 선택자로 못 찾았다면 화면 상의 첫 번째 활성화된 input을 시도합니다.
-        searchInput = await this.page!.locator('input:not([type="hidden"])').first();
-      }
-
-      await searchInput.focus();
-      await this.page!.keyboard.type(phoneNumber, { delay: 100 });
-      await this.page!.waitForTimeout(1000);
+      // 2. 전화번호 입력창 입력
+      await this.page!.waitForTimeout(300);
+      const searchInput = await this.page!.locator('input[placeholder*="이름"], input[placeholder*="번호"], input[aria-label*="전화번호"], .contact-picker-input input').first();
+      await searchInput.focus({ timeout: 2000 }).catch(() => {});
+      await this.page!.keyboard.type(phoneNumber, { delay: 50 });
       await this.page!.keyboard.press('Enter');
       await this.page!.waitForTimeout(500);
       
-      // 2-1. 번호 입력 후 검색 결과에서 '보내기' 또는 첫 번째 항목 클릭 시도
-      try {
-        // 연락처 칩(Chip)을 선택하거나 검색 결과를 클릭합니다.
-        const sendToButton = await this.page!.waitForSelector(
-          'div[role="button"]:has-text("보내기"), .contact-list-item, [aria-label*="보내기"], [data-e2e-id="search-result-item"]',
-          { timeout: 5000 }
-        );
-        await sendToButton.click();
-      } catch (e: any) {
-        if (isFatal(e)) throw e;
-        console.log('[GoogleMessages] 결과 클릭 생략 (엔터로 2차 진입 시도)');
-        await this.page!.keyboard.press('Enter'); // 수신자 확정 후 대화방 진입을 위한 두 번째 Enter
-      }
-      
-      // 3. 메시지 입력창 대기
-      // 포괄적인 aria-label 대신, 실제로 글자를 입력할 수 있는 요소만 정확히 타겟팅합니다.
-      const msgInput = await this.page!.waitForSelector(
-        'textarea, div[role="textbox"][contenteditable="true"]',
-        { timeout: 15000 }
-      );
-      
-      console.log(`[GoogleMessages] 메시지 입력 중...`);
-      await msgInput.focus();
-      
-      // fill()이 실패할 수 있는 엣지 케이스를 방지하기 위해 키보드 직접 타이핑 폴백 적용
-      try {
-        await msgInput.fill(message);
-      } catch (e) {
-        console.log('[GoogleMessages] fill() 메서드 실패, 키보드로 직접 텍스트 타이핑 시도...');
-        await this.page!.keyboard.type(message, { delay: 50 });
-      }
-
-      // 4. 전송 버튼 클릭 또는 Enter
-      await this.page!.waitForTimeout(1000);
+      // 2-1. 번호 입력 후 검색 결과 확정 (엔터를 한 번 더 치는 것이 가장 빠름)
+      // console.log('[GoogleMessages] 결과 클릭 생략 (엔터로 2차 진입 시도)');
       await this.page!.keyboard.press('Enter');
       
-      // 5. 전송 완료 대기 및 세션 확인용 잠시 대기
-      await this.page!.waitForTimeout(3000);
+      // 3. 메시지 입력창 대기 및 입력
+      const msgInput = await this.page!.waitForSelector('textarea, div[role="textbox"][contenteditable="true"]', { timeout: 5000 });
+      await msgInput.focus();
+      
+      // 빠른 fill() 시도 후 실패시 타이핑
+      try {
+        await msgInput.fill(message, { timeout: 2000 });
+      } catch (e) {
+        await this.page!.keyboard.type(message, { delay: 20 });
+      }
+
+      // 4. 전송 (Enter)
+      await this.page!.waitForTimeout(500);
+      await this.page!.keyboard.press('Enter');
+      
+      // 5. 전송 완료 확인을 위한 최소 대기 (3초 -> 1.5초)
+      await this.page!.waitForTimeout(1500);
       
       console.log(`[GoogleMessages] 발송 명령 완료: ${phoneNumber}`);
       return { success: true };
     } catch (err: any) {
-      console.error('[GoogleMessages] 발송 오류 상세:', err);
-      // 오류 발생 시 스크린샷 저장
-      try {
-        const screenshotPath = path.join(process.cwd(), 'storage', `sms-error-${Date.now()}.png`);
-        await this.page?.screenshot({ path: screenshotPath });
-        console.log(`[GoogleMessages] 에러 스크린샷 저장됨: ${screenshotPath}`);
-      } catch (e) {}
+      console.error('[GoogleMessages] 발송 오류:', err.message || err);
       
-      if (err.message?.includes('Target closed') || 
-          err.message?.includes('navigation') || 
-          err.message?.includes('Target crashed') ||
-          err.message?.includes('crash') ||
-          err.message?.includes('closed')) {
-        console.log('[GoogleMessages] 치명적 오류 감지, 브라우저 세션 초기화 시도...');
+      if (isFatal(err)) {
+        console.log('[GoogleMessages] 치명적 오류로 세션 초기화');
         await this.close();
       }
       return { success: false, error: err.message || err };

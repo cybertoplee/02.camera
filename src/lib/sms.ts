@@ -1,4 +1,4 @@
-import { queryTable, executeSQL, updateRows } from '@root/egdesk-helpers';
+import { queryTable, executeSQL, updateRows, insertRows } from '@root/egdesk-helpers';
 import { gmAutomation } from '@/lib/google-messages';
 import fs from 'fs';
 import path from 'path';
@@ -105,3 +105,107 @@ export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
   }
 }
 
+/**
+ * 출결 기록 DB 저장 (즉시 응답용)
+ */
+export async function createAttendanceLogs(requests: { studentId: number, type: 'IN' | 'OUT' }[], timestamp: string) {
+  try {
+    const logRows = requests.map(req => ({
+      student_id: req.studentId,
+      type: req.type,
+      timestamp: timestamp,
+      status: 'NORMAL',
+      sms_status: 'SENDING'
+    }));
+    
+    await insertRows('attendance_logs', logRows);
+    logToFile(`[DB 저장] ${requests.length}건 기록 완료 (타임스탬프: ${timestamp})`);
+    return { success: true };
+  } catch (err: any) {
+    logToFile(`[DB 저장 에러] ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * 여러 명의 학생에게 일괄 출결 알림 문자 발송
+ */
+export async function sendAttendanceSMSBatch(requests: { studentId: number, type: 'IN' | 'OUT' }[], timestamp?: string) {
+  if (requests.length === 0) return { success: true, count: 0 };
+  
+  try {
+    const ts = timestamp || new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' });
+    logToFile(`[배치 시작] 총 ${requests.length}건 발송 프로세스 시작`);
+
+    // 2. 공통 설정 및 브라우저 초기화
+    const settingsRes = await queryTable('tkd_system_settings');
+    const settings = settingsRes.rows || [];
+    
+    const isEnabled = settings.find((s: any) => s.key === 'sms_enabled')?.value === 'true' || 
+                      settings.find((s: any) => s.key === 'sms_enabled')?.value === 'ON';
+    
+    if (!isEnabled) {
+      logToFile('[배치 중단] SMS 발송 설정이 꺼져 있습니다.');
+      return { success: false, error: 'SMS disabled' };
+    }
+
+    const templateIn = settings.find((s: any) => s.key === 'sms_template_in')?.value || '[EG태권도] {name} 학생이 {time}에 등원하였습니다.';
+    const templateOut = settings.find((s: any) => s.key === 'sms_template_out')?.value || '[EG태권도] {name} 학생이 {time}에 하원하였습니다.';
+
+    // 브라우저 1회 초기화
+    await gmAutomation.init(true);
+    
+    let successCount = 0;
+    
+    for (const req of requests) {
+      try {
+        const { studentId, type } = req;
+        
+        // 학생 정보 조회
+        const studentRes = await executeSQL(`SELECT name, parent_phone, parent_name FROM students WHERE id = ${studentId}`);
+        const student = studentRes.rows?.[0];
+        
+        if (!student || !student.parent_phone) {
+          logToFile(`[배치/스킵] 학생 정보 또는 번호 없음 (ID: ${studentId})`);
+          continue;
+        }
+
+        // 메시지 생성
+        const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        const message = (type === 'IN' ? templateIn : templateOut)
+          .replace('{name}', student.name)
+          .replace('{parent}', student.parent_name || '학부모님')
+          .replace('{time}', timeStr);
+
+        // 발송
+        const result = await gmAutomation.sendSMS(student.parent_phone, message);
+        
+        // 결과 DB 반영
+        const status = result.success ? 'SUCCESS' : 'FAILED';
+        const lastLogRes = await executeSQL(`
+          SELECT id FROM attendance_logs 
+          WHERE student_id = ${studentId} AND type = '${type}'
+          ORDER BY id DESC LIMIT 1
+        `);
+        if (lastLogRes.rows && lastLogRes.rows.length > 0) {
+          await updateRows('attendance_logs', { sms_status: status }, { ids: [lastLogRes.rows[0].id] });
+        }
+
+        if (result.success) successCount++;
+        
+        // 연속 발송 사이 짧은 대기 (안정성)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (err: any) {
+        logToFile(`[배치/에러] 개별 발송 중 오류: ${err.message}`);
+      }
+    }
+
+    logToFile(`[배치 종료] 완료: ${successCount}/${requests.length}`);
+    return { success: true, count: successCount };
+
+  } catch (err: any) {
+    logToFile(`[배치 치명적 에러] ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
