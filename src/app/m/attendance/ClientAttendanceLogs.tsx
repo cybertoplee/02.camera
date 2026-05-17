@@ -20,7 +20,7 @@ export default function ClientAttendanceLogs({ initialLogs, allStudents, error }
   const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
   const [processedIds, setProcessedIds] = React.useState<Set<number>>(new Set());
   const [isProcessing, setIsProcessing] = React.useState(false);
-  const [sendSmsOnBatch, setSendSmsOnBatch] = React.useState(true);
+  const [sendSmsOnBatch, setSendSmsOnBatch] = React.useState(false);
 
   const failedSmsCount = React.useMemo(() => {
     return initialLogs.filter(l => l.sms_status === 'FAILED').length;

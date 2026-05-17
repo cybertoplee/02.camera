@@ -39,7 +39,7 @@ export default function AttendanceManagementPage() {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [sendSmsOnBatch, setSendSmsOnBatch] = useState(true);
+  const [sendSmsOnBatch, setSendSmsOnBatch] = useState(false);
 
   const handleBatchProcess = async (type: 'IN' | 'OUT', targetStudentIds: number[]) => {
     if (targetStudentIds.length === 0) return;
