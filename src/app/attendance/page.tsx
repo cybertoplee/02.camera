@@ -231,7 +231,7 @@ export default function AttendanceMonitorPage() {
 
         // 탐지 시작 (다중 얼굴 인식으로 변경, 임계값 상향 조정하여 오인식 방지)
         const detections = await faceapi
-          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.5 }))
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
           .withFaceLandmarks()
           .withFaceDescriptors();
 

@@ -160,7 +160,7 @@ export default function StudentRegisterPage() {
 
       try {
         const faceapi = await import('@vladmandic/face-api');
-        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions());
+        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }));
         
         const canvas = canvasRef.current;
         if (canvas.width !== videoRef.current.videoWidth) {
@@ -236,7 +236,7 @@ export default function StudentRegisterPage() {
       }
 
       const detections = await faceapi
-        .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
 
