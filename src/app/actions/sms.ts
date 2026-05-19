@@ -10,7 +10,11 @@ import path from 'path';
  */
 export async function sendAttendanceSMSAction(studentId: number, type: 'IN' | 'OUT') {
   try {
-    fs.writeFileSync('c:\\dev\\egdesk-tkd\\storage\\ACTION_CALLED.txt', `Action invoked for student ${studentId} at ${new Date().toISOString()}`);
+    const storageDir = path.join(process.cwd(), 'storage');
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(storageDir, 'ACTION_CALLED.txt'), `Action invoked for student ${studentId} at ${new Date().toISOString()}`);
     return await sendAttendanceSMS(studentId, type);
   } catch (err) {
     console.error('[Server Action] SMS 발송 오류:', err);

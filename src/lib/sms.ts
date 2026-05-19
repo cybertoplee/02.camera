@@ -3,13 +3,17 @@ import { gmAutomation } from '@/lib/google-messages';
 import fs from 'fs';
 import path from 'path';
 
-const LOG_FILE = 'c:\\dev\\egdesk-tkd\\storage\\sms-log.txt';
-const DEBUG_FILE = 'c:\\dev\\egdesk-tkd\\storage\\DEBUG_SMS.txt';
+const LOG_FILE = path.join(process.cwd(), 'storage', 'sms-log.txt');
+const DEBUG_FILE = path.join(process.cwd(), 'storage', 'DEBUG_SMS.txt');
 
 function logToFile(message: string) {
   const timestamp = new Date().toLocaleString('ko-KR');
   const logMessage = `[${timestamp}] ${message}\n`;
   try {
+    const storageDir = path.dirname(LOG_FILE);
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
     fs.appendFileSync(LOG_FILE, logMessage);
   } catch (err) {
     console.error('로그 파일 기록 실패:', err);
@@ -22,6 +26,10 @@ function logToFile(message: string) {
 export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
   try {
     // 디버그용 즉시 쓰기
+    const storageDir = path.dirname(DEBUG_FILE);
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
     fs.writeFileSync(DEBUG_FILE, `CALLED at ${new Date().toISOString()}`);
     
     logToFile(`[시작] 학생 ID: ${studentId}, 타입: ${type}`);
@@ -36,7 +44,7 @@ export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
     const isEnabled = smsEnabledEntry?.value === 'true' || smsEnabledEntry?.value === 'ON';
     if (!isEnabled) {
       logToFile(`[중단] SMS 발송 설정이 꺼져 있습니다. (현재값: ${smsEnabledEntry?.value})`);
-      return;
+      return { success: false, error: 'SMS 발송 설정이 비활성화 상태입니다.' };
     }
 
     const templateIn = settings.find((s: any) => s.key === 'sms_template_in')?.value || '[EG태권도] {name} 학생이 {time}에 등원하였습니다.';
@@ -48,12 +56,12 @@ export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
     
     if (!student) {
       logToFile(`[에러] 학생 정보를 찾을 수 없습니다. (ID: ${studentId})`);
-      return;
+      return { success: false, error: `학생 정보를 찾을 수 없습니다. (ID: ${studentId})` };
     }
 
     if (!student.parent_phone) {
       logToFile(`[중단] 학부모 연락처가 없습니다. (학생: ${student.name})`);
-      return;
+      return { success: false, error: `학부모 연락처가 없습니다. (학생: ${student.name})` };
     }
 
     // 3. 메시지 치환
