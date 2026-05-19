@@ -235,7 +235,8 @@ export default function SettingsPage() {
       if (res.success) {
         setTestStatus('발송 성공! 휴대폰을 확인해주세요.');
       } else {
-        let errorMsg = res.error || '알 수 없는 오류';
+        const rawError = res.error || '알 수 없는 오류';
+        let errorMsg = typeof rawError === 'string' ? rawError : (rawError.message || String(rawError));
         if (errorMsg.includes('Timeout') || errorMsg.includes('locator.focus') || errorMsg.includes('waiting for locator')) {
           errorMsg = '기기 연동이 해제되었습니다.\n[기기 연동하기] 버튼을 눌러 다시 연결해 주세요.';
         } else if (errorMsg.includes('Session closed')) {

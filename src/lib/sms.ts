@@ -109,7 +109,7 @@ export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
   } catch (err: any) {
     logToFile(`[치명적 에러] ${err.message || err}`);
     console.error('[SMS] 발송 처리 중 오류 발생:', err);
-    return { success: false, error: err };
+    return { success: false, error: err.message || String(err) };
   }
 }
 
