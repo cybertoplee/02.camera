@@ -54,7 +54,6 @@ export default function StudentManagementPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [mounted, setMounted] = useState(false);
   const isPageMounted = useRef(true);
 
   useEffect(() => {
