@@ -49,8 +49,12 @@ export default function AttendanceMonitorPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const recognitionCooldowns = useRef<Map<number, number>>(new Map());
   const lastDateRef = useRef<string>(new Date().toLocaleDateString('en-CA'));
+  const isPageMounted = useRef(true);
 
   useEffect(() => {
+    isPageMounted.current = true;
+    setMounted(true);
+
     // 1. Load AI Models
     const loadModels = async () => {
       try {
@@ -61,7 +65,9 @@ export default function AttendanceMonitorPage() {
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
-        setIsModelLoaded(true);
+        if (isPageMounted.current) {
+          setIsModelLoaded(true);
+        }
       } catch (err) {
         console.error('모델 로드 실패:', err);
       }
@@ -73,6 +79,8 @@ export default function AttendanceMonitorPage() {
         const res = await fetch('/api/attendance_init');
         if (!res.ok) throw new Error('API request failed');
         const data = await res.json();
+        
+        if (!isPageMounted.current) return;
         
         if (data.students) setStudents(data.students);
         setTodayCount(data.count || 0);
@@ -98,7 +106,6 @@ export default function AttendanceMonitorPage() {
       }
     };
 
-    setMounted(true);
     loadModels();
     fetchData();
 
@@ -107,6 +114,8 @@ export default function AttendanceMonitorPage() {
       const now = new Date();
       const todayStr = now.toLocaleDateString('en-CA');
       
+      if (!isPageMounted.current) return;
+
       // 날짜가 바뀌었을 경우 리셋
       if (todayStr !== lastDateRef.current) {
         setTodayCount(0);
@@ -120,7 +129,11 @@ export default function AttendanceMonitorPage() {
     updateClock();
     const timer = setInterval(updateClock, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      isPageMounted.current = false;
+      clearInterval(timer);
+      stopVideo();
+    };
   }, []);
 
   const stopVideo = () => {
@@ -136,6 +149,7 @@ export default function AttendanceMonitorPage() {
   const [cameraError, setCameraError] = useState('');
 
   const startVideo = async () => {
+    if (!isPageMounted.current) return;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
       setCameraError('이 브라우저에서는 카메라를 사용할 수 없습니다. (HTTPS 환경 또는 PC 필요)');
       return;
@@ -150,6 +164,12 @@ export default function AttendanceMonitorPage() {
           facingMode: 'user'
         } 
       });
+
+      if (!isPageMounted.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         console.log('Webcam stream started');
@@ -157,19 +177,21 @@ export default function AttendanceMonitorPage() {
       }
     } catch (err: any) {
       console.error('Webcam access error:', err);
-      let errMsg = '카메라 접근 권한이 없거나 카메라를 찾을 수 없습니다.';
-      if (err.name === 'NotAllowedError') {
-        errMsg = '카메라 접근 권한이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.';
-      } else if (err.name === 'NotFoundError') {
-        errMsg = 'PC에 연결된 카메라 장치를 찾을 수 없습니다. 웹캠이 제대로 연결되어 있는지 확인해주세요.';
-      } else if (err.name === 'NotReadableError') {
-        errMsg = '카메라가 이미 다른 프로그램(예: 줌, 카카오톡, 다른 브라우저 탭)에서 사용 중입니다.';
-      } else if (err.name === 'AbortError') {
-        errMsg = '카메라를 시작하는 중 시간이 초과되었습니다. 카메라가 멈췄거나, 백신 프로그램 및 하드웨어 설정(프라이버시 셔터)에 의해 차단되었을 수 있습니다.';
-      } else {
-        errMsg = `카메라 에러: ${err.name} - ${err.message}`;
+      if (isPageMounted.current) {
+        let errMsg = '카메라 접근 권한이 없거나 카메라를 찾을 수 없습니다.';
+        if (err.name === 'NotAllowedError') {
+          errMsg = '카메라 접근 권한이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.';
+        } else if (err.name === 'NotFoundError') {
+          errMsg = 'PC에 연결된 카메라 장치를 찾을 수 없습니다. 웹캠이 제대로 연결되어 있는지 확인해주세요.';
+        } else if (err.name === 'NotReadableError') {
+          errMsg = '카메라가 이미 다른 프로그램(예: 줌, 카카오톡, 다른 브라우저 탭)에서 사용 중입니다.';
+        } else if (err.name === 'AbortError') {
+          errMsg = '카메라를 시작하는 중 시간이 초과되었습니다. 카메라가 멈췄거나, 백신 프로그램 및 하드웨어 설정(프라이버시 셔터)에 의해 차단되었을 수 있습니다.';
+        } else {
+          errMsg = `카메라 에러: ${err.name} - ${err.message}`;
+        }
+        setCameraError(errMsg);
       }
-      setCameraError(errMsg);
     }
   };
 
@@ -177,7 +199,6 @@ export default function AttendanceMonitorPage() {
     if (isModelLoaded) {
       startVideo();
     }
-    return () => stopVideo();
   }, [isModelLoaded]);
 
   // 실시간 얼굴 인식 루프

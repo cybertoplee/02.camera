@@ -54,10 +54,19 @@ export default function StudentManagementPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const [mounted, setMounted] = useState(false);
+  const isPageMounted = useRef(true);
+
   useEffect(() => {
+    isPageMounted.current = true;
     setMounted(true);
     fetchData();
     loadFaceModels();
+
+    return () => {
+      isPageMounted.current = false;
+      stopVideo();
+    };
   }, []);
 
   const loadFaceModels = async () => {
@@ -69,13 +78,17 @@ export default function StudentManagementPage() {
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
       ]);
-      setIsModelLoaded(true);
+      if (isPageMounted.current) {
+        setIsModelLoaded(true);
+      }
     } catch (err) {
       console.error('Face models load failed:', err);
     }
   };
 
   const startVideo = async (retryCount = 0) => {
+    if (!isPageMounted.current) return;
+
     // If modal is not open yet, wait and retry
     if (!videoRef.current) {
       if (retryCount < 10) {
@@ -95,13 +108,21 @@ export default function StudentManagementPage() {
           facingMode: 'user'
         } 
       });
+
+      if (!isPageMounted.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setFaceStatus('웹캠이 연결되었습니다.');
       }
     } catch (err) {
       console.error('Webcam access failed:', err);
-      setFaceStatus('카메라 연결에 실패했습니다. 권한을 확인해주세요.');
+      if (isPageMounted.current) {
+        setFaceStatus('카메라 연결에 실패했습니다. 권한을 확인해주세요.');
+      }
     }
   };
 

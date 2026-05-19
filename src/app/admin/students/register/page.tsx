@@ -33,7 +33,10 @@ export default function StudentRegisterPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [mounted, setMounted] = useState(false);
+  const isPageMounted = useRef(true);
+
   useEffect(() => {
+    isPageMounted.current = true;
     setMounted(true);
     const loadModels = async () => {
       try {
@@ -44,17 +47,26 @@ export default function StudentRegisterPage() {
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
-        setIsModelLoaded(true);
-        setStatus('AI 모델 로딩 완료. 웹캠을 연결합니다...');
-        startVideo();
+        if (isPageMounted.current) {
+          setIsModelLoaded(true);
+          setStatus('AI 모델 로딩 완료. 웹캠을 연결합니다...');
+          startVideo();
+        }
       } catch (err) {
         console.error('모델 로드 실패:', err);
-        setStatus('AI 모델 로드 실패. 서버 설정을 확인하세요.');
+        if (isPageMounted.current) {
+          setStatus('AI 모델 로드 실패. 서버 설정을 확인하세요.');
+        }
       }
     };
     loadModels();
     fetchCustomFields();
     fetchClasses();
+
+    return () => {
+      isPageMounted.current = false;
+      stopVideo();
+    };
   }, []);
 
   const fetchClasses = async () => {
@@ -85,7 +97,18 @@ export default function StudentRegisterPage() {
     }
   };
 
+  const stopVideo = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const tracks = stream.getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      console.log('Webcam stream stopped');
+    }
+  };
+
   const startVideo = async () => {
+    if (!isPageMounted.current) return;
     if (videoRef.current?.srcObject) return;
 
     try {
@@ -96,13 +119,21 @@ export default function StudentRegisterPage() {
           facingMode: 'user'
         } 
       });
+      
+      if (!isPageMounted.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setStatus('얼굴을 정중앙에 맞춰주세요.');
       }
     } catch (err) {
       console.error('Webcam access failed:', err);
-      setStatus('웹캠을 찾을 수 없습니다.');
+      if (isPageMounted.current) {
+        setStatus('웹캠을 찾을 수 없습니다.');
+      }
     }
   };
 
