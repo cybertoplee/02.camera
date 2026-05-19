@@ -67,7 +67,7 @@ async function setupDatabase() {
   // 5. Student Classes Table
   try {
     await createTable('반 관리', [
-      { name: 'id', type: 'INTEGER', primaryKey: true },
+      { name: 'id', type: 'INTEGER', notNull: true },
       { name: 'name', type: 'TEXT', notNull: true },
     ], { tableName: 'student_classes', uniqueKeyColumns: ['id'] });
 
@@ -85,13 +85,47 @@ async function setupDatabase() {
     console.error('Error during setup step:', e.message);
   }
 
+  // 6. Custom Fields Table
+  try {
+    await createTable('사용자 정의 필드', [
+      { name: 'id', type: 'INTEGER', notNull: true },
+      { name: 'field_name', type: 'TEXT', notNull: true },
+      { name: 'display_name', type: 'TEXT', notNull: true },
+    ], { tableName: 'custom_fields', uniqueKeyColumns: ['id'] });
+    console.log('Table "custom_fields" created.');
+  } catch (e) {
+    console.error('Error during setup step:', e.message);
+  }
+
+  // 7. System Settings Table
+  try {
+    await createTable('태권도 시스템 설정', [
+      { name: 'key', type: 'TEXT', notNull: true },
+      { name: 'value', type: 'TEXT' }
+    ], { tableName: 'tkd_system_settings', uniqueKeyColumns: ['key'], duplicateAction: 'update' });
+    
+    const existingSettings = await queryTable('tkd_system_settings');
+    if (!existingSettings.rows || existingSettings.rows.length === 0) {
+      await insertRows('tkd_system_settings', [
+        { key: 'attendance_refresh_interval', value: '1' },
+        { key: 'attendance_auto_checkout_minutes', value: '10' },
+        { key: 'sms_enabled', value: 'false' },
+        { key: 'sms_template_in', value: '[EG태권도] {name} 학생이 {time}에 등원하였습니다.' },
+        { key: 'sms_template_out', value: '[EG태권도] {name} 학생이 {time}에 하원하였습니다.' }
+      ]);
+    }
+    console.log('Table "tkd_system_settings" created and initialized.');
+  } catch (e) {
+    console.error('Error during setup step:', e.message);
+  }
+
   console.log('Database setup complete.');
 }
 
 async function resetAndSetup() {
   console.log('Fetching tables...');
   const res = await listTables();
-  const tablesToReset = ['students', 'classes', 'attendance_logs', 'payment_records', 'student_classes'];
+  const tablesToReset = ['students', 'classes', 'attendance_logs', 'payment_records', 'student_classes', 'custom_fields', 'tkd_system_settings'];
   
   for (const tableName of tablesToReset) {
     if (res.tables.find(t => t.tableName === tableName)) {

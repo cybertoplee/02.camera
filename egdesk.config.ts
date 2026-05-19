@@ -1,13 +1,13 @@
 /**
  * EGDesk User Data Configuration
- * Generated at: 2026-05-17T13:22:24.615Z
+ * Generated at: 2026-05-19T12:13:38.541Z
  *
  * This file contains type-safe definitions for your EGDesk tables.
  */
 
 export const EGDESK_CONFIG = {
   apiUrl: 'http://localhost:8080',
-  apiKey: 'a67ddc0f-7e2b-4997-9a0b-9667a74c89d0',
+  apiKey: '7e708c6b-333b-4442-a13c-6bfe50f3389b',
 } as const;
 
 export interface TableDefinition {
@@ -22,105 +22,25 @@ export interface TableDefinition {
 
 export const TABLES = {
   table1: {
-    name: 'tkd_usage_logs',
-    displayName: '사용량 통계 로그',
-    rowCount: 0,
-    columnCount: 4,
-    columns: ['id', 'type', 'timestamp', 'student_id']
+    name: 'platform_master_db',
+    displayName: 'DB보험설계사 문제은행 플랫폼',
+    rowCount: 401,
+    columnCount: 23,
+    columns: ['id', 'license_id', 'license_name', 'total_questions', 'time_limit_min', 'pass_score', 'subject_id', 'part_name', 'subject_title', 'exam_id', 'round_number', 'exam_type', 'question_id', 'question_num', 'passage_text', 'question_text', 'option_1', 'option_2', 'option_3', 'option_4', 'correct_answer', 'explanation', 'difficulty']
   } as TableDefinition,
   table2: {
-    name: 'students',
-    displayName: '학생 명단',
-    rowCount: 10,
-    columnCount: 13,
-    columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id', 'receive_sms_in', 'receive_sms_out', 'status']
+    name: 'user_db',
+    displayName: 'MEM보험설계사 문제은행 플랫폼',
+    rowCount: 21,
+    columnCount: 9,
+    columns: ['id', 'user_id', 'password', 'name', 'email', 'phone', 'role', 'score1', 'created_at']
   } as TableDefinition,
   table3: {
-    name: 'students_old_1778936377614',
-    displayName: '학생 명단 (백업_1778936377614)',
-    description: '학생 기본 정보 및 부가 정보',
-    rowCount: 8,
+    name: 'tax_payroll_ledger',
+    displayName: 'DB금계산서TAXAI',
+    rowCount: 2,
     columnCount: 12,
-    columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id', 'receive_sms_in', 'receive_sms_out']
-  } as TableDefinition,
-  table4: {
-    name: 'students_backup_2',
-    displayName: 'students_backup_2',
-    description: '학생 기본 정보 및 부가 정보',
-    rowCount: 3,
-    columnCount: 11,
-    columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id', 'receive_sms']
-  } as TableDefinition,
-  table5: {
-    name: 'attendance_logs',
-    displayName: '출결 기록',
-    description: '학생 출결 기록 및 문자 발송 상태',
-    rowCount: 23,
-    columnCount: 6,
-    columns: ['id', 'student_id', 'timestamp', 'type', 'status', 'sms_status']
-  } as TableDefinition,
-  table6: {
-    name: 'tkd_system_settings',
-    displayName: '태권도 시스템 설정',
-    rowCount: 5,
-    columnCount: 3,
-    columns: ['id', 'key', 'value']
-  } as TableDefinition,
-  table7: {
-    name: 'system_settings',
-    displayName: '시스템 설정',
-    rowCount: 0,
-    columnCount: 3,
-    columns: ['id', 'key', 'value']
-  } as TableDefinition,
-  table8: {
-    name: 'student_classes',
-    displayName: '반 관리',
-    rowCount: 4,
-    columnCount: 2,
-    columns: ['id', 'name']
-  } as TableDefinition,
-  table9: {
-    name: 'payment_records',
-    displayName: '수납 기록',
-    rowCount: 0,
-    columnCount: 6,
-    columns: ['id', 'student_id', 'amount', 'payment_date', 'depositor_name', 'status']
-  } as TableDefinition,
-  table10: {
-    name: 'attendance_logs_backup',
-    displayName: 'attendance_logs_backup',
-    rowCount: 0,
-    columnCount: 5,
-    columns: ['id', 'student_id', 'timestamp', 'type', 'status']
-  } as TableDefinition,
-  table11: {
-    name: 'students_backup',
-    displayName: 'students_backup',
-    rowCount: 3,
-    columnCount: 10,
-    columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id']
-  } as TableDefinition,
-  table12: {
-    name: 'classes',
-    displayName: '수업 정보',
-    rowCount: 0,
-    columnCount: 4,
-    columns: ['id', 'name', 'start_time', 'end_time']
-  } as TableDefinition,
-  table13: {
-    name: 'custom_fields',
-    displayName: '사용자 정의 항목',
-    rowCount: 0,
-    columnCount: 3,
-    columns: ['id', 'field_name', 'display_name']
-  } as TableDefinition,
-  table14: {
-    name: 'test_like',
-    displayName: 'Test Table',
-    rowCount: 1,
-    columnCount: 2,
-    columns: ['id', 'val']
+    columns: ['id', '데이터ID', '성명', '부서', '지급액_과세', '지급액_비과세', '국민연금', '건강보험', '고용보험', '소득세', '지방소득세', '실수령액']
   } as TableDefinition
 } as const;
 
@@ -136,18 +56,7 @@ export function getTableByName(tableName: string): TableDefinition | undefined {
 
 // Export table names for easy access
 export const TABLE_NAMES = {
-  table1: 'tkd_usage_logs',
-  table2: 'students',
-  table3: 'students_old_1778936377614',
-  table4: 'students_backup_2',
-  table5: 'attendance_logs',
-  table6: 'tkd_system_settings',
-  table7: 'system_settings',
-  table8: 'student_classes',
-  table9: 'payment_records',
-  table10: 'attendance_logs_backup',
-  table11: 'students_backup',
-  table12: 'classes',
-  table13: 'custom_fields',
-  table14: 'test_like'
+  table1: 'platform_master_db',
+  table2: 'user_db',
+  table3: 'tax_payroll_ledger'
 } as const;
