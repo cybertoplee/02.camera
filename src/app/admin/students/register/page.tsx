@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ClipboardEdit, Camera } from 'lucide-react';
+import { ArrowLeft, ClipboardEdit, Camera, Home } from 'lucide-react';
 import { insertRows, queryTable, executeSQL } from '@root/egdesk-helpers';
 interface CustomField {
   id: number;
@@ -29,6 +29,8 @@ export default function StudentRegisterPage() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [status, setStatus] = useState('AI 모델 로딩 중...');
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isFaceDetected, setIsFaceDetected] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -49,8 +51,7 @@ export default function StudentRegisterPage() {
         ]);
         if (isPageMounted.current) {
           setIsModelLoaded(true);
-          setStatus('AI 모델 로딩 완료. 웹캠을 연결합니다...');
-          startVideo();
+          setStatus('');
         }
       } catch (err) {
         console.error('모델 로드 실패:', err);
@@ -142,6 +143,25 @@ export default function StudentRegisterPage() {
     setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
+  const toggleCamera = () => {
+    if (isCameraOn) {
+      stopVideo();
+      setIsCameraOn(false);
+      setStatus('');
+      setIsFaceDetected(false);
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+      }
+    } else {
+      setIsCameraOn(true);
+      setStatus('카메라 켜는 중...');
+      startVideo();
+    }
+  };
+
   // Face Tracking Loop
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -173,6 +193,7 @@ export default function StudentRegisterPage() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           
           if (detection) {
+            setIsFaceDetected(true);
             const { x, y, width, height } = detection.box;
             
             ctx.strokeStyle = '#3B82F6';
@@ -190,6 +211,8 @@ export default function StudentRegisterPage() {
             ctx.textAlign = 'center';
             ctx.fillText('FACE DETECTED', 0, 0);
             ctx.restore();
+          } else {
+            setIsFaceDetected(false);
           }
         }
       } catch (err) {}
@@ -323,7 +346,18 @@ export default function StudentRegisterPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em' }}>신규 관원 등록</h2>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em', cursor: 'pointer' }}>신규 관원 등록</h2>
+          </Link>
+        </div>
+        <div>
+          <Link 
+            href="/attendance" 
+            className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-600 transition-colors cursor-pointer no-underline"
+          >
+            <Home size={20} />
+            <span>홈으로 가기</span>
+          </Link>
         </div>
       </header>
 
@@ -456,21 +490,35 @@ export default function StudentRegisterPage() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
           <div style={{ backgroundColor: '#0F172A', width: '100%', borderRadius: '40px', padding: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
             {/* Scanner Effect */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,1)] animate-scan z-10"></div>
+            {isCameraOn && (
+              <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,1)] animate-scan z-10"></div>
+            )}
             
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-black text-white tracking-tight">AI 얼굴 벡터 분석기</h3>
-              <span style={{ 
-                fontSize: '10px', 
-                padding: '6px 12px', 
-                borderRadius: '9999px', 
-                fontWeight: 900, 
-                backgroundColor: status.includes('완료') ? '#065F46' : status.includes('실패') ? '#991B1B' : '#1E293B',
-                color: '#FFFFFF',
-                border: '1px solid rgba(255,255,255,0.1)'
-              }}>
-                {status.includes('완료') ? '준비됨' : status.includes('분석') ? '분석중' : '대기중'}
-              </span>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={toggleCamera} 
+                  className="bg-transparent border-none p-1 cursor-pointer transition-transform active:scale-90"
+                  title="카메라 켜기/끄기"
+                >
+                  <Camera 
+                    size={24} 
+                    className={isCameraOn ? "text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]"} 
+                  />
+                </button>
+                <span style={{ 
+                  fontSize: '10px', 
+                  padding: '6px 12px', 
+                  borderRadius: '9999px', 
+                  fontWeight: 900, 
+                  backgroundColor: !isCameraOn ? '#991B1B' : (isFaceDetected ? '#065F46' : '#1E293B'),
+                  color: '#FFFFFF',
+                  border: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                  {!isCameraOn ? '꺼짐' : (isFaceDetected ? '작동중' : '대기중')}
+                </span>
+              </div>
             </div>
 
             <div className="relative w-full aspect-video bg-black rounded-[32px] overflow-hidden border-2 border-slate-800 shadow-inner group mb-4">
@@ -486,6 +534,14 @@ export default function StudentRegisterPage() {
                 style={{ transform: `scaleX(-1) scale(${zoom})`, transformOrigin: 'center' }} 
                 className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-200 pointer-events-none" 
               />
+
+              {!isCameraOn && (
+                <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                  <span className="text-emerald-400 text-sm md:text-base font-black tracking-wide bg-slate-900/80 px-6 py-3 rounded-full border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)] backdrop-blur-md">
+                    먼저 신규관원 등록 후 카메라를 켜세요.
+                  </span>
+                </div>
+              )}
               
               {isCapturing && (
                 <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-20">
@@ -496,11 +552,13 @@ export default function StudentRegisterPage() {
                 </div>
               )}
               
-              <div className="absolute bottom-6 left-6 right-6 bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-                <p className={`text-[12px] font-bold text-center leading-relaxed ${status.includes('실패') ? 'text-red-400' : 'text-white'}`}>
-                  {status}
-                </p>
-              </div>
+              {status && (
+                <div className="absolute bottom-6 left-6 right-6 bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                  <p className={`text-[12px] font-bold text-center leading-relaxed ${status.includes('실패') ? 'text-red-400' : 'text-white'}`}>
+                    {status}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Zoom Slider */}

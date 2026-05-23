@@ -172,42 +172,42 @@ export class GoogleMessagesAutomation {
    * 메시지 발송
    */
   async sendSMS(phoneNumber: string, message: string) {
+    // 치명적 오류 확인 헬퍼
+    const isFatal = (err: any) => err?.message?.includes('closed') || err?.message?.includes('crash') || err?.message?.includes('navigation');
+
     try {
       if (!this.page || this.page.isClosed()) await this.init(true);
       
       console.log(`[GoogleMessages] 메시지 발송 시작: ${phoneNumber}`);
 
-      // 치명적 오류 확인 헬퍼
-      const isFatal = (err: any) => err?.message?.includes('closed') || err?.message?.includes('crash') || err?.message?.includes('navigation');
-
-      // 1. '채팅 시작' / '대화 시작' 버튼 탐색 (실패 및 지연이 발생하는 동작이므로 주석 처리)
-      /*
+      // 1. '채팅 시작' / '대화 시작' 버튼 탐색
       try {
-        const startChatButton = this.page!.locator('button:has-text("시작"), a:has-text("시작"), [aria-label*="시작"], .fab-container button').first();
-        await startChatButton.waitFor({ state: 'visible', timeout: 3000 });
+        const startChatButton = this.page!.locator('button:has-text("시작"), a:has-text("시작"), [aria-label*="시작"], button:has-text("Start chat")').first();
+        await startChatButton.waitFor({ state: 'visible', timeout: 5000 });
         await startChatButton.click({ timeout: 2000 });
       } catch (e: any) {
         if (isFatal(e)) throw e;
-        await this.page!.keyboard.press('Enter');
+        // 실패 시 폴백: 'c' 키는 새 메시지 단축키이거나 탭 키로 이동
+        await this.page!.keyboard.press('c');
       }
-      */
-      // 버튼 클릭 대신 즉시 엔터 또는 단축키로 진입 시도 (속도 개선)
-      await this.page!.keyboard.press('Enter');
       
       // 2. 전화번호 입력창 입력
-      await this.page!.waitForTimeout(300);
-      const searchInput = await this.page!.locator('input[placeholder*="이름"], input[placeholder*="번호"], input[aria-label*="전화번호"], .contact-picker-input input').first();
+      await this.page!.waitForTimeout(500);
+      const searchInput = await this.page!.locator('input[placeholder*="이름"], input[placeholder*="번호"], input[aria-label*="전화번호"], input[placeholder*="name"], input[placeholder*="number"]').first();
+      await searchInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       await searchInput.focus({ timeout: 2000 }).catch(() => {});
       await this.page!.keyboard.type(phoneNumber, { delay: 50 });
-      await this.page!.keyboard.press('Enter');
       await this.page!.waitForTimeout(500);
       
-      // 2-1. 번호 입력 후 검색 결과 확정 (엔터를 한 번 더 치는 것이 가장 빠름)
-      // console.log('[GoogleMessages] 결과 클릭 생략 (엔터로 2차 진입 시도)');
+      // 검색 결과 확정 (번호 입력 후 아래 화살표 -> 엔터 -> 엔터)
+      await this.page!.keyboard.press('ArrowDown');
+      await this.page!.waitForTimeout(200);
+      await this.page!.keyboard.press('Enter');
+      await this.page!.waitForTimeout(500);
       await this.page!.keyboard.press('Enter');
       
       // 3. 메시지 입력창 대기 및 입력
-      const msgInput = await this.page!.waitForSelector('textarea, div[role="textbox"][contenteditable="true"]', { timeout: 5000 });
+      const msgInput = await this.page!.waitForSelector('textarea, div[role="textbox"][contenteditable="true"], .textarea', { timeout: 8000 });
       await msgInput.focus();
       
       // 빠른 fill() 시도 후 실패시 타이핑

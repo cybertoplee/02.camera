@@ -58,7 +58,7 @@ export default function Sidebar() {
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {[
           { href: "/admin/students/register", icon: UserPlus, label: "신규 관원 등록", color: "#2563EB" },
-          { href: "/attendance", icon: MonitorPlay, label: "출석 모니터 시작", color: "#10B981", target: "_blank" },
+          { href: "/attendance", icon: MonitorPlay, label: "출석 모니터 시작", color: "#10B981" },
           { href: "/admin/attendance", icon: ClipboardList, label: "출결 기록 관리", color: "#6366F1" },
           { href: "/admin/students", icon: Users, label: "전체 관원 관리", color: "#0EA5E9" },
         ].map((item) => (

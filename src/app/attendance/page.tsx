@@ -3,7 +3,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, User, TriangleAlert, CheckCircle, Loader2, MonitorPlay, UserPlus } from 'lucide-react';
+import { ArrowLeft, User, TriangleAlert, CheckCircle, Loader2, MonitorPlay, UserPlus, Home, Camera } from 'lucide-react';
 // import * as faceapi from '@vladmandic/face-api'; // 제거 후 useEffect 내 동적 임포트 사용
 import { queryTable, insertRows, aggregateTable, executeSQL } from '@root/egdesk-helpers';
 import { sendAttendanceSMSAction } from '../actions/sms';
@@ -35,6 +35,7 @@ export default function AttendanceMonitorPage() {
   const autoCheckoutMinutesRef = useRef(10);
   const smsEnabledRef = useRef(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
 
   useEffect(() => {
     autoCheckoutMinutesRef.current = autoCheckoutMinutes;
@@ -146,6 +147,20 @@ export default function AttendanceMonitorPage() {
     }
   };
 
+  const toggleCamera = () => {
+    if (isCameraOn) {
+      stopVideo();
+      setIsCameraOn(false);
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+    } else {
+      setIsCameraOn(true);
+      startVideo();
+    }
+  };
+
   const [cameraError, setCameraError] = useState('');
 
   const startVideo = async () => {
@@ -196,9 +211,7 @@ export default function AttendanceMonitorPage() {
   };
 
   useEffect(() => {
-    if (isModelLoaded) {
-      startVideo();
-    }
+    // 자동 실행 해제: 사용자가 직접 ON 버튼을 눌러야 실행됨
   }, [isModelLoaded]);
 
   // 실시간 얼굴 인식 루프
@@ -224,7 +237,15 @@ export default function AttendanceMonitorPage() {
         const canvas = canvasRef.current;
 
         // 캔버스 크기 조정
-        const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
+        const displayWidth = video.offsetWidth || video.videoWidth;
+        const displayHeight = video.offsetHeight || video.videoHeight;
+        
+        if (displayWidth <= 0 || displayHeight <= 0) {
+          if (isRunning) requestAnimationFrame(recognitionLoop);
+          return;
+        }
+        
+        const displaySize = { width: displayWidth, height: displayHeight };
         if (canvas.width !== displaySize.width) {
           faceapi.matchDimensions(canvas, displaySize);
         }
@@ -239,7 +260,6 @@ export default function AttendanceMonitorPage() {
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (detections && detections.length > 0) {
-          const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
           const resizedDetections = faceapi.resizeResults(detections, displaySize);
           
           for (const detection of resizedDetections) {
@@ -411,12 +431,12 @@ export default function AttendanceMonitorPage() {
           autoPlay
           muted
           playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-50 filter contrast-125 saturate-50"
+          className={`absolute inset-0 w-full h-full object-cover filter contrast-125 saturate-50 transition-opacity duration-500 ${isCameraOn ? 'opacity-50' : 'opacity-0'}`}
           style={{ transform: 'scaleX(-1)' }}
         />
         {/* HUD Scanner Effect overlay */}
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
-        <div className="absolute top-0 left-0 w-full h-2 bg-blue-500/30 blur-md animate-scan z-0"></div>
+        {isCameraOn && <div className="absolute top-0 left-0 w-full h-2 bg-blue-500/30 blur-md animate-scan z-0"></div>}
       </div>
       
       <canvas 
@@ -434,18 +454,35 @@ export default function AttendanceMonitorPage() {
         </div>
       )}
 
+      {/* Central Camera Toggle Button */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+        <button 
+          onClick={toggleCamera}
+          className={`pointer-events-auto flex flex-col items-center justify-center gap-2 rounded-[32px] backdrop-blur-md transition-all duration-500 active:scale-95 border shadow-2xl ${
+            isCameraOn 
+              ? "w-32 h-20 bg-red-500/10 border-red-500/30 hover:bg-red-500/30 text-red-100 opacity-20 hover:opacity-100 translate-y-80" 
+              : "w-64 h-64 bg-emerald-500/90 border-emerald-400 hover:bg-emerald-400 text-white shadow-[0_0_50px_rgba(16,185,129,0.5)]"
+          }`}
+        >
+          <Camera size={isCameraOn ? 24 : 80} className={isCameraOn ? "text-red-400" : "text-white"} />
+          <span className={`font-black tracking-widest ${isCameraOn ? "text-[10px]" : "text-2xl mt-4"}`}>
+            {isCameraOn ? "카메라 끄기" : "출석 시작 (ON)"}
+          </span>
+        </button>
+      </div>
+
       {/* UI Overlay */}
       <div className="absolute inset-0 flex flex-col justify-between p-6 md:p-16 pointer-events-none z-20">
         {/* Top Bar - Glassmorphism */}
         <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-          <div className="flex flex-col items-start gap-0.5">
+          <Link href="/" className="flex flex-col items-start gap-0.5 cursor-pointer no-underline hover:opacity-80 transition-opacity">
             <div className="text-lg md:text-2xl font-bold text-white tracking-tight opacity-80">
               {currentDate}
             </div>
             <div className="text-6xl md:text-9xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.2)] tracking-tighter tabular-nums leading-none">
               {currentTime}
             </div>
-          </div>
+          </Link>
           
           <div className="flex flex-col items-end gap-2 md:gap-4 w-full md:w-auto">
             <div className="hidden md:flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto no-scrollbar">
@@ -468,6 +505,13 @@ export default function AttendanceMonitorPage() {
               >
                 <MonitorPlay className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} /> <span>전체 화면</span>
               </button>
+
+              <Link
+                href="/"
+                className="pointer-events-auto bg-slate-900/80 hover:bg-slate-900 text-white px-5 py-3 md:px-8 md:py-4 rounded-full border border-white/20 backdrop-blur-md transition-all text-xs md:text-base font-bold shadow-2xl active:scale-95 flex items-center gap-2 no-underline whitespace-nowrap"
+              >
+                <Home className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
+              </Link>
             </div>
             
             {!isModelLoaded && (
@@ -535,7 +579,7 @@ export default function AttendanceMonitorPage() {
           <div className="relative w-full max-w-lg md:max-w-5xl flex flex-col gap-4 md:gap-6 items-center justify-center animate-in zoom-in-95 slide-in-from-bottom-20 duration-700">
             {matchedStudents.map(({ student, type, smsStatus }, index) => (
               <div 
-                key={student.id}
+                key={`${student.id}-${index}`}
                 className="relative w-full bg-white/10 backdrop-blur-3xl rounded-[30px] md:rounded-[40px] overflow-hidden animate-in slide-in-from-bottom-10 duration-500 shadow-none border-none"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
