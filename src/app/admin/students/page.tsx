@@ -45,6 +45,7 @@ export default function StudentManagementPage() {
   // Face Registration State
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
   const [faceStatus, setFaceStatus] = useState('');
   const [newFaceVector, setNewFaceVector] = useState<string | null>(null);
   const [newProfileImage, setNewProfileImage] = useState<string | null>(null);
@@ -348,12 +349,7 @@ export default function StudentManagementPage() {
     setClasses([]);
     fetchClasses();
     
-    // Increase delay to 1000ms to ensure modal animation is complete
-    setTimeout(() => {
-      if (document.visibilityState === 'visible') {
-        startVideo();
-      }
-    }, 1000);
+    setIsCameraOn(false);
   };
 
   const [classes, setClasses] = useState<{id: number, name: string}[]>([]);
@@ -367,6 +363,7 @@ export default function StudentManagementPage() {
   };
 
   const closeEdit = () => {
+    setIsCameraOn(false);
     stopVideo();
     setEditingStudent(null);
   };
@@ -1002,7 +999,7 @@ export default function StudentManagementPage() {
                     style={{ 
                       transform: `scaleX(-1) scale(${zoom})`, 
                       transformOrigin: 'center',
-                      display: (pendingCapture || (newProfileImage && !isCapturing)) ? 'none' : 'block' 
+                      display: (pendingCapture || (newProfileImage && !isCapturing) || !isCameraOn) ? 'none' : 'block' 
                     }} 
                     className="w-full h-full object-cover opacity-90 transition-transform duration-200" 
                   />
@@ -1011,12 +1008,18 @@ export default function StudentManagementPage() {
                     style={{ 
                       transform: `scaleX(-1) scale(${zoom})`, 
                       transformOrigin: 'center',
-                      display: (pendingCapture || (newProfileImage && !isCapturing)) ? 'none' : 'block' 
+                      display: (pendingCapture || (newProfileImage && !isCapturing) || !isCameraOn) ? 'none' : 'block' 
                     }} 
                     className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-200 pointer-events-none" 
                   />
                   {(pendingCapture || (newProfileImage && !isCapturing)) && (
                     <img src={pendingCapture ? pendingCapture.image : (newProfileImage || '')} className="w-full h-full object-cover" alt="Captured" />
+                  )}
+                  {!isCameraOn && !pendingCapture && !(newProfileImage && !isCapturing) && (
+                    <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-slate-500">
+                      <Camera size={48} className="mb-4 opacity-20" />
+                      <span className="text-sm font-black tracking-widest uppercase">카메라 꺼짐</span>
+                    </div>
                   )}
                   {isCapturing && (
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
@@ -1026,11 +1029,13 @@ export default function StudentManagementPage() {
                       </div>
                     </div>
                   )}
-                  <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,1)] animate-scan z-10"></div>
+                  {isCameraOn && (
+                    <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,1)] animate-scan z-10"></div>
+                  )}
                 </div>
 
                 {/* Zoom Slider */}
-                {(!pendingCapture && !(newProfileImage && !isCapturing)) && (
+                {(!pendingCapture && !(newProfileImage && !isCapturing) && isCameraOn) && (
                   <div className="flex items-center gap-4 bg-[#1E293B] p-4 rounded-2xl border border-white/5">
                     <span className="text-xs font-black text-slate-400">줌</span>
                     <input 
@@ -1057,9 +1062,22 @@ export default function StudentManagementPage() {
                       </button>
                     </div>
                   ) : (
-                    <button onClick={handleCaptureFace} disabled={isCapturing} className="w-full bg-white text-slate-900 py-6 rounded-[24px] font-black text-lg hover:bg-blue-50 active:scale-95 transition-all flex items-center justify-center gap-3 shadow-xl">
-                      <Camera size={24} /> {editingStudent.face_vector ? '얼굴 다시 촬영' : '새 얼굴 촬영'}
-                    </button>
+                    <div className="flex flex-col gap-4">
+                      {isCameraOn ? (
+                        <div className="flex gap-4">
+                          <button onClick={() => { setIsCameraOn(false); stopVideo(); }} className="flex-1 bg-red-600/20 text-red-500 border border-red-500/50 py-4 rounded-[24px] font-black text-base hover:bg-red-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+                            카메라 끄기
+                          </button>
+                          <button onClick={handleCaptureFace} disabled={isCapturing} className="flex-[2] bg-white text-slate-900 py-4 rounded-[24px] font-black text-lg hover:bg-blue-50 active:scale-95 transition-all flex items-center justify-center gap-3 shadow-xl">
+                            <Camera size={24} /> {editingStudent.face_vector ? '얼굴 다시 촬영' : '새 얼굴 촬영'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => { setIsCameraOn(true); startVideo(); }} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/50 py-6 rounded-[24px] font-black text-lg hover:bg-blue-600/30 active:scale-95 transition-all flex items-center justify-center gap-3 shadow-xl">
+                          <Camera size={24} /> 카메라 켜기
+                        </button>
+                      )}
+                    </div>
                   )}
                   <p className="text-slate-500 text-[11px] text-center font-bold leading-relaxed uppercase tracking-wider">
                     정면을 응시하면 자동으로 특징을 분석합니다.<br/>촬영된 사진은 프로필로 자동 등록됩니다.
@@ -1069,7 +1087,7 @@ export default function StudentManagementPage() {
 
               <div className="relative z-10 pt-10 flex flex-col gap-5">
                 <button onClick={handleUpdate} className="w-full bg-blue-600 text-white py-6 rounded-[32px] font-black text-xl hover:bg-blue-500 shadow-[0_25px_50px_-12px_rgba(37,99,235,0.4)] active:scale-95 transition-all border border-blue-400/20">수정 내용 저장하기</button>
-                <button onClick={closeEdit} className="w-full py-4 text-slate-500 font-black hover:text-slate-300 transition-colors uppercase tracking-widest text-[11px]">수정 취소</button>
+                <button onClick={closeEdit} className="w-full py-4 text-slate-500 font-black hover:text-slate-300 transition-colors uppercase tracking-widest text-[11px]">나가기</button>
               </div>
             </div>
           </div>

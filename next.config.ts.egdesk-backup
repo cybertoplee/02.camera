@@ -3,6 +3,22 @@ import type { NextConfig } from "next";
 console.log('🔍 DEBUG next.config: EGDESK_BASE_PATH env var =', process.env.EGDESK_BASE_PATH);
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+      allowedOrigins: [
+        'localhost:3000',
+        '127.0.0.1:3000',
+        '*.loca.lt',
+        '*.ngrok.io',
+        '*.ngrok-free.app',
+        '*.trycloudflare.com',
+        '*.gitpod.io',
+        '*.tryhook.io',
+        '*.localto.net'
+      ]
+    }
+  },
   eslint: {
     // Always skip ESLint errors to prevent blocking on auto-generated files
     ignoreDuringBuilds: true,

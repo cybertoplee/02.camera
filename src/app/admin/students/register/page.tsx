@@ -352,7 +352,7 @@ export default function StudentRegisterPage() {
         </div>
         <div>
           <Link 
-            href="/attendance" 
+            href="/" 
             className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-600 transition-colors cursor-pointer no-underline"
           >
             <Home size={20} />

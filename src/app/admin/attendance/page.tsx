@@ -851,6 +851,32 @@ export default function AttendanceManagementPage() {
           border-color: #DBEAFE !important;
         }
       `}</style>
+      
+      {/* 나가기 버튼 */}
+      <a 
+        href="http://localhost:3001/#"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          padding: '16px 32px',
+          backgroundColor: '#0F172A',
+          color: 'white',
+          borderRadius: '100px',
+          fontWeight: 900,
+          textDecoration: 'none',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          transition: 'all 0.3s'
+        }}
+        className="hover:bg-slate-800 hover:-translate-y-1"
+      >
+        <span>나가기</span>
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+      </a>
     </div>
   );
 }

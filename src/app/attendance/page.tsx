@@ -486,13 +486,6 @@ export default function AttendanceMonitorPage() {
           
           <div className="flex flex-col items-end gap-2 md:gap-4 w-full md:w-auto">
             <div className="hidden md:flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto no-scrollbar">
-              <Link
-                href="/admin/students/register"
-                className="pointer-events-auto bg-slate-900/80 hover:bg-slate-900 text-white px-5 py-3 md:px-8 md:py-4 rounded-full border border-white/20 backdrop-blur-md transition-all text-xs md:text-base font-bold shadow-2xl active:scale-95 flex items-center gap-2 no-underline whitespace-nowrap"
-              >
-                <UserPlus className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} /> <span>신규 등록</span>
-              </Link>
-
               <button 
                 onClick={() => {
                   if (!document.fullscreenElement) {
