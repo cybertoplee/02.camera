@@ -854,11 +854,11 @@ export default function AttendanceManagementPage() {
       
       {/* 나가기 버튼 */}
       <a 
-        href="http://localhost:3001/#"
+        href="http://localhost:3000/"
         style={{
           position: 'fixed',
           bottom: '24px',
-          right: '24px',
+          left: '24px',
           padding: '16px 32px',
           backgroundColor: '#0F172A',
           color: 'white',
