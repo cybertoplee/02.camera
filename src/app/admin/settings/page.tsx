@@ -59,6 +59,17 @@ export default function SettingsPage() {
     // 5초마다 실시간으로 갱신
     const interval = setInterval(fetchUsageStats, 5000);
 
+    const fetchValidStudentId = async () => {
+      try {
+        const res = await queryTable('students');
+        if (res.rows && res.rows.length > 0) {
+          setTestStudentId(String(res.rows[0].id));
+        }
+      } catch (err) {
+        console.error('학생 ID 로드 실패:', err);
+      }
+    };
+    fetchValidStudentId();
     fetchClasses();
     fetchSystemSettings();
     

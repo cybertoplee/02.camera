@@ -36,6 +36,76 @@ export default function AttendanceMonitorPage() {
   const smsEnabledRef = useRef(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
+  const [cameraFilters, setCameraFilters] = useState('brightness(1.10) contrast(1.10) saturate(1.00)');
+
+  // 실시간 카메라 자동 노출(밝기/채도/대비) 조절 로직
+  useEffect(() => {
+    if (!isCameraOn) return;
+    
+    let isActive = true;
+    const analyzeCanvas = document.createElement('canvas');
+    analyzeCanvas.width = 16;
+    analyzeCanvas.height = 16;
+    const ctx = analyzeCanvas.getContext('2d');
+    
+    const checkBrightness = () => {
+      if (!isActive) return;
+      const video = videoRef.current;
+      if (video && video.readyState >= 2 && ctx) {
+        try {
+          ctx.drawImage(video, 0, 0, 16, 16);
+          const imgData = ctx.getImageData(0, 0, 16, 16);
+          let totalLuminance = 0;
+          
+          for (let i = 0; i < imgData.data.length; i += 4) {
+            const r = imgData.data[i];
+            const g = imgData.data[i+1];
+            const b = imgData.data[i+2];
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            totalLuminance += luminance;
+          }
+          
+          const avgLuminance = totalLuminance / (16 * 16);
+          
+          // 주변 조도(실내/실외)에 따라 밝기(bVal), 대비(cVal), 채도(sVal) 자동 캘리브레이션
+          let bVal = 1.10;
+          let cVal = 1.10;
+          let sVal = 1.00;
+          
+          if (avgLuminance < 70) {
+            // 매우 어두운 실내 -> 밝기 대폭 상향 및 대비 보정
+            bVal = 1.45;
+            cVal = 1.25;
+            sVal = 1.10;
+          } else if (avgLuminance < 110) {
+            // 일반 어두운 실내 -> 밝기 보정
+            bVal = 1.25;
+            cVal = 1.15;
+          } else if (avgLuminance > 180) {
+            // 야외 또는 매우 밝은 실조 -> 조도를 낮춰 얼굴 흐려짐 방지
+            bVal = 0.95;
+            cVal = 1.20;
+            sVal = 0.90;
+          } else if (avgLuminance > 150) {
+            // 일반 밝은 조도 -> 밝기 소폭 감소
+            bVal = 1.00;
+            cVal = 1.15;
+          }
+          
+          setCameraFilters(`brightness(${bVal.toFixed(2)}) contrast(${cVal.toFixed(2)}) saturate(${sVal.toFixed(2)})`);
+        } catch (e) {
+          console.warn('Auto exposure analysis failed:', e);
+        }
+      }
+      setTimeout(checkBrightness, 2000); // 2초마다 갱신
+    };
+    
+    const delayId = setTimeout(checkBrightness, 1000);
+    return () => {
+      isActive = false;
+      clearTimeout(delayId);
+    };
+  }, [isCameraOn]);
 
   useEffect(() => {
     autoCheckoutMinutesRef.current = autoCheckoutMinutes;
@@ -174,8 +244,8 @@ export default function AttendanceMonitorPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          width: { ideal: 640 }, 
-          height: { ideal: 480 },
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 },
           facingMode: 'user'
         } 
       });
@@ -250,9 +320,9 @@ export default function AttendanceMonitorPage() {
           faceapi.matchDimensions(canvas, displaySize);
         }
 
-        // 탐지 시작 (다중 얼굴 인식으로 변경, 임계값 상향 조정하여 오인식 방지)
+        // 탐지 시작 (다중 얼굴 인식으로 변경, 인식 성능과 속도 개선을 위해 임계값 조정)
         const detections = await faceapi
-          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.25 }))
           .withFaceLandmarks()
           .withFaceDescriptors();
 
@@ -298,8 +368,8 @@ export default function AttendanceMonitorPage() {
     const todayStr = new Date().toLocaleDateString('en-CA');
     const lastRecognized = recognitionCooldowns.current.get(student.id) || 0;
     
-    // 1. 아주 짧은 간격(5초) 연속 인식은 완전히 무시
-    if (now - lastRecognized < 5000) {
+    // 1. 30분 이내 추가 출결처리 방지 (30분 = 30 * 60 * 1000 = 1,800,000ms)
+    if (now - lastRecognized < 30 * 60 * 1000) {
       return;
     }
     recognitionCooldowns.current.set(student.id, now);
@@ -323,7 +393,10 @@ export default function AttendanceMonitorPage() {
         const lastTime = new Date(lastEntry.timestamp).getTime();
         const diffMinutes = (now - lastTime) / (1000 * 60);
 
-        if (lastEntry.type === 'IN') {
+        if (diffMinutes < 30) {
+          // 30분 이내 추가 출결처리 제한 -> 아예 인식 자체를 차단하고 무시
+          return;
+        } else if (lastEntry.type === 'IN') {
           if (diffMinutes < autoCheckoutMinutesRef.current) {
             determinedType = 'DUPLICATE';
           } else {
@@ -423,7 +496,7 @@ export default function AttendanceMonitorPage() {
   if (!mounted) return null;
 
   return (
-    <div className="relative w-screen h-screen bg-black overflow-hidden font-sans">
+    <div className="relative w-full h-screen bg-black overflow-hidden font-sans">
       {/* Background Video */}
       <div className="absolute inset-0 bg-slate-950">
         <video
@@ -431,13 +504,30 @@ export default function AttendanceMonitorPage() {
           autoPlay
           muted
           playsInline
-          className={`absolute inset-0 w-full h-full object-cover filter contrast-125 saturate-50 transition-opacity duration-500 ${isCameraOn ? 'opacity-50' : 'opacity-0'}`}
-          style={{ transform: 'scaleX(-1)' }}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isCameraOn ? 'opacity-95' : 'opacity-0'}`}
+          style={{ transform: 'scaleX(-1)', filter: cameraFilters }}
         />
         {/* HUD Scanner Effect overlay */}
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
         {isCameraOn && <div className="absolute top-0 left-0 w-full h-2 bg-blue-500/30 blur-md animate-scan z-0"></div>}
       </div>
+
+      {/* Dim outside the target box */}
+      {isCameraOn && (
+        <div 
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            zIndex: 8,
+            boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.65)',
+            borderRadius: '32px'
+          }}
+          className="w-[410px] h-[500px] md:w-[850px] md:h-[1000px]"
+        />
+      )}
       
       <canvas 
         ref={canvasRef} 
@@ -516,8 +606,8 @@ export default function AttendanceMonitorPage() {
           </div>
         </div>
 
-        {/* Center Target Guide - Futuristic Responsive */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] h-[350px] md:w-[400px] md:h-[500px] pointer-events-none">
+        {/* Center Target Guide - Futuristic Responsive (영역 20% 추가 확장) */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[410px] h-[500px] md:w-[850px] md:h-[1000px] pointer-events-none">
           {/* Corner Brackets */}
           <div className="absolute top-0 left-0 w-12 h-12 md:w-16 md:h-16 border-t-4 border-l-4 border-blue-500/50 rounded-tl-3xl"></div>
           <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 border-t-4 border-r-4 border-blue-500/50 rounded-tr-3xl"></div>

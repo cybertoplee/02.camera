@@ -70,7 +70,7 @@ export default function Sidebar() {
         cursor: disabled ? 'not-allowed' : 'pointer'
       }}>
         <Icon size={20} color={disabled ? '#94A3B8' : color} />
-        <span style={{ fontWeight: 700, fontSize: '14px', color: disabled ? '#94A3B8' : '#475569' }}>{label}</span>
+        <span className="notranslate" translate="no" style={{ fontWeight: 700, fontSize: '14px', color: disabled ? '#94A3B8' : '#475569' }}>{label}</span>
       </div>
     );
 
@@ -101,7 +101,7 @@ export default function Sidebar() {
       height: '100vh', 
       position: 'sticky', 
       top: 0, 
-      padding: '32px',
+      padding: '32px 16px',
       borderRight: '1px solid #E2E8F0',
       backgroundColor: '#FFFFFF',
       display: 'flex',
@@ -125,33 +125,31 @@ export default function Sidebar() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
-              <span style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.04em' }}>EG</span>
-              <span style={{ fontSize: '22px', fontWeight: 300, color: '#64748B', letterSpacing: '-0.02em' }}>DESK</span>
+              <span style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A', letterSpacing: '-0.04em' }}>EGDESK</span>
             </div>
-            <div style={{ 
-              fontSize: '9px', 
+            <div className="notranslate" translate="no" style={{ 
+              fontSize: '10px', 
               fontWeight: 800, 
               color: '#3B82F6', 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.15em',
-              marginTop: '-2px',
+              letterSpacing: '0.05em',
+              marginTop: '1px',
               display: 'flex',
               alignItems: 'center',
               gap: '4px'
             }}>
               <span style={{ width: '4px', height: '4px', backgroundColor: '#3B82F6', borderRadius: '50%' }}></span>
-              AI TAEKWONDO
+              팀일도킥복싱멀티짐
             </div>
           </div>
         </div>
       </Link>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {renderMenuItem("/admin/students/register", UserPlus, "신규 관원 등록", "#2563EB")}
-        {renderMenuItem("/attendance", MonitorPlay, "출석 모니터 시작", "#10B981")}
-        {renderMenuItem("/admin/attendance", ClipboardList, "출결 기록 관리", "#6366F1")}
-        {renderMenuItem("/admin/students", Users, "전체 관원 관리", "#0EA5E9")}
-        {renderMenuItem("/admin/payments", Coins, "수납 내역 관리", "#E11D48")}
+        {renderMenuItem("/admin/students/register", UserPlus, "신규회원등록", "#2563EB")}
+        {renderMenuItem("/attendance", MonitorPlay, "출결모니터링", "#10B981")}
+        {renderMenuItem("/admin/attendance", ClipboardList, "출결기록현황", "#6366F1")}
+        {renderMenuItem("/admin/students", Users, "전체회원관리", "#0EA5E9")}
+        {renderMenuItem("/admin/payments", Coins, "수납내역관리", "#E11D48")}
         
         <div style={{ margin: '16px 0', borderTop: '1px solid #F1F5F9' }}></div>
         
@@ -229,10 +227,10 @@ export default function Sidebar() {
                 <User size={18} color={role === 'DEVELOPER' ? '#2563EB' : role === 'ADMIN' ? '#EF4444' : '#16A34A'} />
               </div>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+                <div className="notranslate" translate="no" style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
                   {getRoleDisplayName()}
                 </div>
-                <div style={{ fontSize: '12px', color: '#64748B' }}>
+                <div className="notranslate" translate="no" style={{ fontSize: '12px', color: '#64748B' }}>
                   접속중
                 </div>
               </div>

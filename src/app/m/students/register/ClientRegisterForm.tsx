@@ -159,7 +159,7 @@ export default function ClientRegisterForm({ classes, customFields, error }: { c
         <Link href="/m/students" className="p-2 -ml-2 text-slate-400 hover:text-slate-700 bg-slate-100/50 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="text-xl font-black text-slate-900 tracking-tight">신규 관원 등록</h1>
+        <h1 className="text-xl font-black text-slate-900 tracking-tight">신규회원등록</h1>
       </header>
 
       <div className="p-4 flex flex-col gap-4">
@@ -333,7 +333,7 @@ export default function ClientRegisterForm({ classes, customFields, error }: { c
             className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-lg py-4.5 rounded-2xl shadow-xl shadow-blue-600/20 transition-all active:scale-[0.98] flex justify-center items-center gap-2"
           >
             <UserPlus size={22} />
-            신규 관원 등록하기
+            신규회원 등록하기
           </button>
         </form>
       </div>

@@ -6,17 +6,17 @@ import Sidebar from './Sidebar';
 
 export default function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAttendanceMonitor = pathname === '/attendance';
   const isMobileRoute = pathname.startsWith('/m');
+  const isAttendance = pathname === '/attendance';
 
-  if (isAttendanceMonitor || isMobileRoute) {
+  if (isMobileRoute) {
     return <>{children}</>;
   }
 
   return (
     <div style={{ 
       display: 'grid', 
-      gridTemplateColumns: '320px 1fr', 
+      gridTemplateColumns: '240px 1fr', 
       minHeight: '100vh', 
       width: '100%', 
       backgroundColor: '#F8FAFC'
@@ -47,8 +47,27 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
 
       <Sidebar />
 
-      <main style={{ padding: '48px', overflowY: 'auto' }}>
+      <main 
+        key={pathname}
+        style={{ 
+          padding: isAttendance ? '0' : '48px', 
+          overflowY: isAttendance ? 'hidden' : 'auto',
+          animation: 'fadeInSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+        }}
+      >
         {children}
+        <style jsx global>{`
+          @keyframes fadeInSlide {
+            from {
+              opacity: 0;
+              transform: translateX(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+        `}</style>
       </main>
     </div>
   );

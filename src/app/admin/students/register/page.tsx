@@ -36,6 +36,7 @@ export default function StudentRegisterPage() {
 
   const [mounted, setMounted] = useState(false);
   const isPageMounted = useRef(true);
+  const faceapiRef = useRef<any>(null);
 
   useEffect(() => {
     isPageMounted.current = true;
@@ -43,6 +44,7 @@ export default function StudentRegisterPage() {
     const loadModels = async () => {
       try {
         const faceapi = await import('@vladmandic/face-api');
+        faceapiRef.current = faceapi;
         const MODEL_URL = '/models/';
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -69,6 +71,8 @@ export default function StudentRegisterPage() {
       stopVideo();
     };
   }, []);
+
+
 
   const fetchClasses = async () => {
     try {
@@ -128,7 +132,7 @@ export default function StudentRegisterPage() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setStatus('얼굴을 정중앙에 맞춰주세요.');
+        setStatus('');
       }
     } catch (err) {
       console.error('Webcam access failed:', err);
@@ -156,6 +160,10 @@ export default function StudentRegisterPage() {
         }
       }
     } else {
+      if (!formData.name) {
+        alert('학생 이름을 입력해주세요.');
+        return;
+      }
       setIsCameraOn(true);
       setStatus('카메라 켜는 중...');
       startVideo();
@@ -169,18 +177,18 @@ export default function StudentRegisterPage() {
 
     const trackFace = async () => {
       if (!isModelLoaded || !videoRef.current || !canvasRef.current || isCapturing) {
-        if (isActive) timeoutId = setTimeout(trackFace, 150);
+        if (isActive) timeoutId = setTimeout(trackFace, 30);
         return;
       }
       
       if (videoRef.current.readyState < 2) {
-        if (isActive) timeoutId = setTimeout(trackFace, 150);
+        if (isActive) timeoutId = setTimeout(trackFace, 30);
         return;
       }
 
       try {
-        const faceapi = await import('@vladmandic/face-api');
-        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }));
+        const faceapi = faceapiRef.current || await import('@vladmandic/face-api');
+        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.3 }));
         
         const canvas = canvasRef.current;
         if (canvas.width !== videoRef.current.videoWidth) {
@@ -218,7 +226,7 @@ export default function StudentRegisterPage() {
       } catch (err) {}
 
       if (isActive) {
-        timeoutId = setTimeout(trackFace, 150);
+        timeoutId = setTimeout(trackFace, 30);
       }
     };
 
@@ -235,6 +243,14 @@ export default function StudentRegisterPage() {
   const handleRegister = async () => {
     if (!formData.name) {
       alert('학생 이름을 입력해주세요.');
+      // 이전 입력 상태로 이동 (카메라 끄기 및 입력 폼 표시)
+      stopVideo();
+      setIsCameraOn(false);
+      setIsFaceDetected(false);
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
       return;
     }
 
@@ -244,7 +260,7 @@ export default function StudentRegisterPage() {
     setStatus('얼굴 특징 분석 중...');
 
     try {
-      const faceapi = await import('@vladmandic/face-api');
+      const faceapi = faceapiRef.current || await import('@vladmandic/face-api');
       
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
@@ -259,7 +275,7 @@ export default function StudentRegisterPage() {
       }
 
       const detections = await faceapi
-        .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
+        .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.3 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -317,6 +333,15 @@ export default function StudentRegisterPage() {
       setStatus('등록 완료!');
       alert(`${formData.name} 학생이 성공적으로 등록되었습니다.`);
       
+      // 카메라 끄기 및 상태 초기화
+      stopVideo();
+      setIsCameraOn(false);
+      setIsFaceDetected(false);
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+      
       const resetData: any = {
         name: '',
         parentName: '',
@@ -347,7 +372,7 @@ export default function StudentRegisterPage() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Link href="/" style={{ textDecoration: 'none' }}>
-            <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em', cursor: 'pointer' }}>신규 관원 등록</h2>
+            <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em', cursor: 'pointer' }}>신규회원등록</h2>
           </Link>
         </div>
         <div>
@@ -361,9 +386,10 @@ export default function StudentRegisterPage() {
         </div>
       </header>
 
-      <main style={{ display: 'flex', gap: '40px', alignItems: 'flex-start' }}>
+      <main style={{ display: 'flex', gap: '40px', alignItems: 'flex-start', justifyContent: 'center' }}>
         {/* Left: Form */}
-        <div style={{ flex: 1 }} className="bg-white/80 backdrop-blur-xl p-8 md:p-12 rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
+        {!isCameraOn && (
+          <div style={{ flex: 1 }} className="bg-white/80 backdrop-blur-xl p-8 md:p-12 rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="flex flex-col gap-2 group">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">학생 이름 *</label>
@@ -485,9 +511,18 @@ export default function StudentRegisterPage() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Right: AI Registration */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
+        <div style={{ 
+          flex: isCameraOn ? '0 1 640px' : 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          gap: '32px',
+          width: '100%',
+          transition: 'all 0.5s ease-in-out'
+        }}>
           <div style={{ backgroundColor: '#0F172A', width: '100%', borderRadius: '40px', padding: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
             {/* Scanner Effect */}
             {isCameraOn && (
@@ -538,7 +573,7 @@ export default function StudentRegisterPage() {
               {!isCameraOn && (
                 <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
                   <span className="text-emerald-400 text-sm md:text-base font-black tracking-wide bg-slate-900/80 px-6 py-3 rounded-full border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)] backdrop-blur-md">
-                    먼저 신규관원 등록 후 카메라를 켜세요.
+                    먼저 신규회원 등록 후 카메라를 켜세요.
                   </span>
                 </div>
               )}
@@ -597,8 +632,14 @@ export default function StudentRegisterPage() {
                 boxShadow: (isModelLoaded && !isCapturing) ? '0 10px 15px -3px rgba(37, 99, 235, 0.3)' : 'none'
               }}
             >
-              {!isCapturing && <Camera size={20} strokeWidth={2.5} />}
-              {isCapturing ? '처리 중...' : '촬영 및 등록 완료'}
+              <span className="flex items-center gap-3">
+                {!isCapturing ? (
+                  <Camera size={20} strokeWidth={2.5} />
+                ) : (
+                  <span className="w-5 h-5 block" />
+                )}
+                <span>{isCapturing ? '처리 중...' : '촬영 및 등록 완료'}</span>
+              </span>
             </button>
           </div>
           

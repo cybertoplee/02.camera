@@ -497,7 +497,7 @@ export default function StudentManagementPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em' }}>전체 관원 관리</h2>
+          <h2 translate="no" className="notranslate" style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em' }}>전체 회원 관리</h2>
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>

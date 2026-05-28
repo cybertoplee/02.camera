@@ -1,6 +1,6 @@
 /**
  * EGDesk User Data Configuration
- * Generated at: 2026-05-24T23:59:25.311Z
+ * Generated at: 2026-05-28T09:44:13.531Z
  *
  * This file contains type-safe definitions for your EGDesk tables.
  */
@@ -153,7 +153,7 @@ export const TABLES = {
   table19: {
     name: 'message_logs',
     displayName: '발송 내역',
-    rowCount: 12,
+    rowCount: 19,
     columnCount: 6,
     columns: ['id', 'customer_id', 'phone', 'message', 'status', 'created_at']
   } as TableDefinition,
@@ -167,7 +167,7 @@ export const TABLES = {
   table21: {
     name: 'crm_customers',
     displayName: '고객 명단',
-    rowCount: 5,
+    rowCount: 9,
     columnCount: 10,
     columns: ['id', 'name', 'phone', 'tags', 'memo', 'address', 'shipping_address', 'recipient_name', 'recipient_phone', 'created_at']
   } as TableDefinition,
@@ -202,14 +202,14 @@ export const TABLES = {
   table26: {
     name: 'attendance_logs',
     displayName: '출결 기록',
-    rowCount: 12,
+    rowCount: 22,
     columnCount: 6,
     columns: ['id', 'student_id', 'timestamp', 'type', 'status', 'sms_status']
   } as TableDefinition,
   table27: {
     name: 'students',
     displayName: '학생 명단',
-    rowCount: 4,
+    rowCount: 8,
     columnCount: 10,
     columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id']
   } as TableDefinition,

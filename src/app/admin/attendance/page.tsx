@@ -322,7 +322,7 @@ export default function AttendanceManagementPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em' }}>출결 기록 관리</h2>
+          <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em' }}>출결기록현황</h2>
         </div>
         
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

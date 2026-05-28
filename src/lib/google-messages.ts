@@ -132,6 +132,20 @@ export class GoogleMessagesAutomation {
         console.log('[GoogleMessages] "여기에서 사용" 버튼 클릭 중...');
         await useHereButton.click();
       }
+
+      // "이 컴퓨터 기억하기" 또는 "Remember this computer" 토글/체크박스 자동 활성화
+      try {
+        const rememberToggle = await this.page!.$('mat-slide-toggle:has-text("기억"), mat-slide-toggle:has-text("Remember"), [aria-label*="기억"], [aria-label*="Remember"], button[role="switch"]:has-text("기억"), button[role="switch"]:has-text("Remember")');
+        if (rememberToggle) {
+          const isChecked = await rememberToggle.getAttribute('aria-checked');
+          if (isChecked === 'false') {
+            console.log('[GoogleMessages] "이 컴퓨터 기억하기" 토글 활성화 중...');
+            await rememberToggle.click();
+          }
+        }
+      } catch (e) {
+        // 무시
+      }
     } catch (err) {
       // 무시
     }
