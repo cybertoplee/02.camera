@@ -170,7 +170,7 @@
                         <span class="text-sm font-black tracking-widest uppercase">Pause</span>
                         <span class="text-[10px] text-yellow-300/80 font-bold mt-1 font-sans">일시정지</span>
                     </button>
-                    <button onclick="makeFullScreen()" class="cyber-btn digital-font border border-blue-500/30 text-blue-400 hover:bg-blue-950/10 hover:border-blue-400 hover:shadow-[0_0_15px_rgba(59,130,246,0.25)] flex-grow md:flex-none w-auto md:w-32 py-4 px-2 rounded-xl flex flex-col justify-center items-center active:scale-95 cursor-pointer">
+                    <button id="btn-fullscreen" onclick="makeFullScreen()" class="cyber-btn digital-font border border-blue-500/30 text-blue-400 hover:bg-blue-950/10 hover:border-blue-400 hover:shadow-[0_0_15px_rgba(59,130,246,0.25)] flex-grow md:flex-none w-auto md:w-32 py-4 px-2 rounded-xl flex flex-col justify-center items-center active:scale-95 cursor-pointer">
                         <span class="text-sm font-black tracking-widest uppercase">Full</span>
                         <span class="text-[10px] text-blue-300/80 font-bold mt-1 font-sans">전체화면</span>
                     </button>
@@ -574,15 +574,17 @@
         function makeFullScreen() {
             const container = document.getElementById('video-container');
             container.classList.remove('max-w-3xl');
-            container.classList.add('max-w-full', 'h-[80vh]');
+            container.classList.add('max-w-full', 'h-[calc(100vh-280px)]');
             document.getElementById('floating-revert-btn').classList.remove('hidden');
+            document.getElementById('btn-fullscreen').classList.add('hidden');
         }
 
         function revertSize() {
             const container = document.getElementById('video-container');
-            container.classList.remove('max-w-full', 'h-[80vh]');
+            container.classList.remove('max-w-full', 'h-[calc(100vh-280px)]');
             container.classList.add('max-w-3xl');
             document.getElementById('floating-revert-btn').classList.add('hidden');
+            document.getElementById('btn-fullscreen').classList.remove('hidden');
         }
 
         function playVideo(url, filename) {
