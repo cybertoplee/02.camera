@@ -121,5 +121,33 @@ export async function setupDatabase() {
     console.error('Error during setup step:', e.message);
   }
 
+  // 8. CCTV Records Table
+  try {
+    await createTable('CCTV 녹화 기록', [
+      { name: 'id', type: 'INTEGER', notNull: true },
+      { name: 'date', type: 'TEXT', notNull: true },
+      { name: 'filename', type: 'TEXT', notNull: true },
+      { name: 'size', type: 'TEXT', notNull: true },
+      { name: 'url', type: 'TEXT' },
+    ], { tableName: 'cctv_records', uniqueKeyColumns: ['id'] });
+    console.log('Table "cctv_records" created.');
+  } catch (e: any) {
+    console.error('Error during setup step:', e.message);
+  }
+
+  // 9. CCTV Events Table
+  try {
+    await createTable('CCTV 이상 감지', [
+      { name: 'id', type: 'INTEGER', notNull: true },
+      { name: 'timestamp', type: 'TEXT', notNull: true },
+      { name: 'type', type: 'TEXT', notNull: true },
+      { name: 'snapshot', type: 'TEXT' },
+      { name: 'video_url', type: 'TEXT' },
+    ], { tableName: 'cctv_events', uniqueKeyColumns: ['id'] });
+    console.log('Table "cctv_events" created.');
+  } catch (e: any) {
+    console.error('Error during setup step:', e.message);
+  }
+
   console.log('Database setup complete.');
 }

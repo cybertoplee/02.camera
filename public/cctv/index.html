@@ -15,13 +15,16 @@
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
 
-    <header class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center">
-        <h1 class="text-xl font-bold text-blue-400">EGDesk AI CCTV</h1>
+    <header class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center shadow-lg">
+        <h1 class="text-xl font-extrabold text-blue-400 tracking-tight flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></span>
+            EGDesk AI CCTV
+        </h1>
         <nav class="space-x-4">
-            <button onclick="showPage('cctv')" class="hover:text-blue-300">CCTV AI</button>
-            <button onclick="showPage('records')" class="hover:text-blue-300">녹화정보</button>
-            <button onclick="showPage('events')" class="hover:text-blue-300">이벤트 정보</button>
-            <button onclick="showPage('settings')" class="hover:text-blue-300">설정</button>
+            <button onclick="showPage('cctv')" class="hover:text-blue-300 font-bold px-3 py-1.5 rounded transition-all">CCTV AI</button>
+            <button onclick="showPage('records')" class="hover:text-blue-300 font-bold px-3 py-1.5 rounded transition-all">녹화정보</button>
+            <button onclick="showPage('events')" class="hover:text-blue-300 font-bold px-3 py-1.5 rounded transition-all">이벤트 정보</button>
+            <button onclick="showPage('settings')" class="hover:text-blue-300 font-bold px-3 py-1.5 rounded transition-all">설정</button>
         </nav>
     </header>
 
@@ -34,26 +37,26 @@
                     <div class="recording-icon blink"></div>
                     <span class="text-xs font-bold text-red-500">REC</span>
                 </div>
-                <div id="focus-frame" class="focus-frame"></div>
+                <div id="focus-frame" class="focus-frame w-28 h-28"></div>
                 <div id="event-beacon" class="hidden absolute top-4 right-4 flex items-center gap-2">
                     <div class="beacon blink"></div>
                     <span class="font-bold text-red-500 animate-pulse">이상 감지!</span>
                 </div>
             </div>
             <div class="mt-4 flex gap-4">
-                <button onclick="startCamera()" class="bg-green-600 px-6 py-2 rounded hover:bg-green-500">Start</button>
-                <button onclick="pauseCamera()" class="bg-yellow-600 px-6 py-2 rounded hover:bg-yellow-500">Pause</button>
-                <button onclick="stopCamera()" class="bg-red-600 px-6 py-2 rounded hover:bg-red-500">Stop</button>
-                <button onclick="exitApp()" class="bg-gray-600 px-6 py-2 rounded hover:bg-gray-500">Exit</button>
+                <button onclick="startCamera()" class="bg-green-600 px-6 py-2.5 rounded-lg font-bold hover:bg-green-500 transition-all active:scale-95">Start</button>
+                <button onclick="pauseCamera()" class="bg-yellow-600 px-6 py-2.5 rounded-lg font-bold hover:bg-yellow-500 transition-all active:scale-95">Pause</button>
+                <button onclick="stopCamera()" class="bg-red-600 px-6 py-2.5 rounded-lg font-bold hover:bg-red-500 transition-all active:scale-95">Stop</button>
+                <button onclick="exitApp()" class="bg-gray-600 px-6 py-2.5 rounded-lg font-bold hover:bg-gray-500 transition-all active:scale-95">Exit</button>
             </div>
         </div>
 
         <!-- 녹화정보 페이지 -->
         <div id="records-page" class="page hidden">
             <h2 class="text-2xl font-bold mb-4">녹화 저장소</h2>
-            <div class="bg-gray-800 rounded-lg p-4">
+            <div class="bg-gray-800 rounded-lg p-4 shadow-xl border border-gray-700">
                 <table class="w-full text-left">
-                    <thead><tr class="text-gray-400 border-b border-gray-700"><th class="p-2">날짜</th><th class="p-2">파일명</th><th class="p-2">용량</th><th class="p-2">기능</th></tr></thead>
+                    <thead><tr class="text-gray-400 border-b border-gray-700"><th class="p-3">일시</th><th class="p-3">파일명</th><th class="p-3">용량</th><th class="p-3">기능</th></tr></thead>
                     <tbody id="record-list"></tbody>
                 </table>
             </div>
@@ -62,9 +65,9 @@
         <!-- 이벤트 정보 페이지 -->
         <div id="events-page" class="page hidden">
             <h2 class="text-2xl font-bold mb-4">이상 감지 로그</h2>
-            <div class="bg-gray-800 rounded-lg p-4">
+            <div class="bg-gray-800 rounded-lg p-4 shadow-xl border border-gray-700">
                 <table class="w-full text-left">
-                    <thead><tr class="text-gray-400 border-b border-gray-700"><th class="p-2">시간</th><th class="p-2">유형</th><th class="p-2">스냅샷</th><th class="p-2">영상</th></tr></thead>
+                    <thead><tr class="text-gray-400 border-b border-gray-700"><th class="p-3">시간</th><th class="p-3">유형</th><th class="p-3">스냅샷</th><th class="p-3">기능</th></tr></thead>
                     <tbody id="event-list"></tbody>
                 </table>
             </div>
@@ -73,12 +76,12 @@
         <!-- 설정 페이지 -->
         <div id="settings-page" class="page">
             <h2 class="text-2xl font-bold mb-4">시스템 설정</h2>
-            <div class="bg-gray-800 p-6 rounded-lg space-y-4">
+            <div class="bg-gray-800 p-6 rounded-lg space-y-4 shadow-xl border border-gray-700">
                 <div>
                     <label class="block mb-2 text-gray-300">녹화 저장 폴더 지정:</label>
                     <div class="flex gap-2">
-                        <input type="text" id="save-path" readonly placeholder="폴더를 선택하세요." class="w-full p-2 bg-gray-700 rounded border border-gray-600">
-                        <button onclick="selectFolder()" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-500 whitespace-nowrap">폴더 선택/생성</button>
+                        <input type="text" id="save-path" readonly placeholder="폴더를 선택하세요." class="w-full p-2 bg-gray-700 rounded border border-gray-600 outline-none">
+                        <button onclick="selectFolder()" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-500 whitespace-nowrap transition-all active:scale-95">폴더 선택/생성</button>
                     </div>
                 </div>
                 <div id="storage-dashboard" class="hidden mt-6 border-t border-gray-700 pt-4">
@@ -95,6 +98,9 @@
     <script>
         let isConfigured = false;
         let stream = null;
+        let detectionInterval = null;
+        let lastEventTime = 0;
+        let recStartTime = null;
         let alarmSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
         alarmSound.loop = true;
 
@@ -106,7 +112,8 @@
                 document.getElementById('storage-dashboard').classList.remove('hidden');
                 updateStorageMetrics();
                 alert("폴더가 설정되었습니다.");
-            } catch (err) { console.log("취소됨"); }
+                showPage('cctv');
+            } catch (err) { console.log("취소됨", err); }
         }
 
         function updateStorageMetrics() {
@@ -121,37 +128,191 @@
             }
             document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
             document.getElementById(id + '-page').classList.remove('hidden');
+
+            if (id === 'records') {
+                loadRecords();
+            } else if (id === 'events') {
+                loadEvents();
+            }
         }
 
         async function startCamera() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
                 document.getElementById('video-stream').srcObject = stream;
                 document.getElementById('rec-indicator').classList.remove('hidden');
+                recStartTime = new Date();
                 startDetection();
             } catch(e) { alert("카메라 접근 불가"); }
         }
 
         function startDetection() {
-            setInterval(() => {
-                if(Math.random() > 0.6) {
-                    const f = document.getElementById('focus-frame');
-                    f.style.display = 'block';
-                    f.style.left = (Math.random()*60+20) + '%';
-                    f.style.top = (Math.random()*60+20) + '%';
-                    document.getElementById('event-beacon').classList.remove('hidden');
-                    alarmSound.play();
+            if (detectionInterval) clearInterval(detectionInterval);
+            detectionInterval = setInterval(async () => {
+                const isAnomaly = Math.random() > 0.6;
+                const focusFrame = document.getElementById('focus-frame');
+                const eventBeacon = document.getElementById('event-beacon');
+
+                if (isAnomaly) {
+                    focusFrame.style.display = 'block';
+                    focusFrame.style.left = (Math.random()*60+10) + '%';
+                    focusFrame.style.top = (Math.random()*60+10) + '%';
+                    eventBeacon.classList.remove('hidden');
+                    try { alarmSound.play(); } catch(e) {}
+
+                    // Log event (Throttle to 8 seconds)
+                    const now = Date.now();
+                    if (now - lastEventTime > 8000) {
+                        lastEventTime = now;
+                        await recordAnomalyEvent();
+                    }
                 } else {
-                    document.getElementById('focus-frame').style.display = 'none';
-                    document.getElementById('event-beacon').classList.add('hidden');
+                    focusFrame.style.display = 'none';
+                    eventBeacon.classList.add('hidden');
                     alarmSound.pause();
                 }
-            }, 2000);
+            }, 2500);
         }
 
-        function stopCamera() { if(stream) { stream.getTracks().forEach(t=>t.stop()); document.getElementById('rec-indicator').classList.add('hidden'); } }
-        function pauseCamera() { document.getElementById('video-stream').pause(); }
-        function exitApp() { stopCamera(); alert("시스템 종료"); }
+        async function recordAnomalyEvent() {
+            const video = document.getElementById('video-stream');
+            let snapshotBase64 = "";
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                if (ctx && video.readyState >= 2) {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    snapshotBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                }
+            } catch(e) { console.error('Snapshot failed', e); }
+
+            try {
+                await fetch('../api/cctv/events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        timestamp: new Date().toLocaleString(),
+                        type: '움직임 이상 감지',
+                        snapshot: snapshotBase64,
+                        video_url: '#'
+                    })
+                });
+            } catch (err) { console.error('Failed to save event to DB', err); }
+        }
+
+        async function stopCamera() {
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+            document.getElementById('focus-frame').style.display = 'none';
+            document.getElementById('event-beacon').classList.add('hidden');
+            alarmSound.pause();
+
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+                document.getElementById('rec-indicator').classList.add('hidden');
+
+                // Save recording log
+                if (recStartTime) {
+                    const now = new Date();
+                    const diffSec = Math.max(1, Math.floor((now - recStartTime) / 1000));
+                    const size = (diffSec * (Math.random() * 0.5 + 0.2)).toFixed(2) + " MB";
+                    const filename = `REC_${recStartTime.getFullYear()}${String(recStartTime.getMonth()+1).padStart(2,'0')}${String(recStartTime.getDate()).padStart(2,'0')}_${String(recStartTime.getHours()).padStart(2,'0')}${String(recStartTime.getMinutes()).padStart(2,'0')}.mp4`;
+                    
+                    try {
+                        await fetch('../api/cctv/records', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                date: recStartTime.toLocaleString(),
+                                filename,
+                                size,
+                                url: '#'
+                            })
+                        });
+                    } catch(err) { console.error('Failed to save recording to DB', err); }
+                    recStartTime = null;
+                }
+            }
+        }
+
+        function pauseCamera() {
+            document.getElementById('video-stream').pause();
+        }
+
+        function exitApp() {
+            stopCamera();
+            alert("CCTV 시스템을 종료합니다.");
+        }
+
+        async function loadRecords() {
+            const list = document.getElementById('record-list');
+            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">데이터 로딩 중...</td></tr>`;
+
+            try {
+                const res = await fetch('../api/cctv/records');
+                const data = await res.json();
+                if (data.success) {
+                    list.innerHTML = "";
+                    data.rows.forEach(r => {
+                        const tr = document.createElement('tr');
+                        tr.className = "border-b border-gray-700 hover:bg-gray-800 transition-colors";
+                        tr.innerHTML = `
+                            <td class="p-3 text-sm">${r.date}</td>
+                            <td class="p-3 text-sm font-semibold">${r.filename}</td>
+                            <td class="p-3 text-sm text-yellow-400">${r.size}</td>
+                            <td class="p-3 text-sm">
+                                <button class="bg-blue-600 px-3 py-1 rounded text-xs hover:bg-blue-500">재생</button>
+                            </td>
+                        `;
+                        list.appendChild(tr);
+                    });
+                    if (data.rows.length === 0) {
+                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">저장된 녹화 정보가 없습니다.</td></tr>`;
+                    }
+                }
+            } catch(e) {
+                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500">불러오기 실패</td></tr>`;
+            }
+        }
+
+        async function loadEvents() {
+            const list = document.getElementById('event-list');
+            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">데이터 로딩 중...</td></tr>`;
+
+            try {
+                const res = await fetch('../api/cctv/events');
+                const data = await res.json();
+                if (data.success) {
+                    list.innerHTML = "";
+                    data.rows.forEach(r => {
+                        const tr = document.createElement('tr');
+                        tr.className = "border-b border-gray-700 hover:bg-gray-800 transition-colors";
+                        tr.innerHTML = `
+                            <td class="p-3 text-sm">${r.timestamp}</td>
+                            <td class="p-3 text-sm text-red-400 font-bold">${r.type}</td>
+                            <td class="p-3">
+                                ${r.snapshot ? `<img src="${r.snapshot}" class="w-20 h-12 object-cover rounded border border-gray-600 cursor-pointer hover:scale-250 transition-all"/>` : 'N/A'}
+                            </td>
+                            <td class="p-3 text-sm">
+                                <button class="bg-red-600 px-3 py-1 rounded text-xs hover:bg-red-500">분석</button>
+                            </td>
+                        `;
+                        list.appendChild(tr);
+                    });
+                    if (data.rows.length === 0) {
+                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">감지된 이상 이벤트가 없습니다.</td></tr>`;
+                    }
+                }
+            } catch(e) {
+                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500">불러오기 실패</td></tr>`;
+            }
+        }
         
         showPage('settings');
     </script>
