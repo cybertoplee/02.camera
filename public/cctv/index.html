@@ -5,121 +5,282 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EGDesk AI CCTV Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800;900&family=Share+Tech+Mono&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Share+Tech+Mono&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Noto Sans KR', sans-serif; }
+        body { 
+            font-family: 'Noto Sans KR', sans-serif; 
+            background-color: #030712;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.15) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, rgba(15, 118, 110, 0.1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.15) 0, transparent 50%);
+            background-attachment: fixed;
+        }
         .digital-font { font-family: 'Share Tech Mono', 'Orbitron', monospace; }
-        .blink { animation: blinker 0.8s linear infinite; }
+        .blink { animation: blinker 1s linear infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
-        .beacon { width: 40px; height: 40px; border-radius: 50%; background: #dc2626; box-shadow: 0 0 20px #ef4444; }
-        .focus-frame { position: absolute; border: 3px solid yellow; display: none; transition: all 0.2s ease-out; border-radius: 8px; box-shadow: 0 0 15px rgba(255, 255, 0, 0.6); }
-        .recording-icon { width: 12px; height: 12px; border-radius: 50%; background: red; }
+        
+        .beacon { width: 32px; height: 32px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 20px #ef4444; }
+        .focus-frame { 
+            position: absolute; 
+            border: 2px solid #facc15; 
+            display: none; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            border-radius: 6px; 
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.6); 
+        }
+        .recording-icon { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+        
+        /* Sci-Fi scan lines and grid */
+        .cctv-grid::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0.4;
+        }
+
+        /* Glassmorphism cyber dashboard panel */
+        .cyber-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        /* Futuristic holographic button */
+        .cyber-btn {
+            background: rgba(31, 41, 55, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .cyber-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: all 0.6s ease;
+        }
+        .cyber-btn:hover::before {
+            left: 150%;
+        }
+        
+        /* Active indicator line under navigation */
+        .nav-link {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .nav-link.active-tab {
+            color: #3b82f6;
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        .nav-link.active-tab::after {
+            content: '';
+            position: absolute;
+            bottom: -4px; left: 0; right: 0;
+            height: 2px;
+            background: #3b82f6;
+            box-shadow: 0 0 10px #3b82f6;
+            border-radius: 2px;
+        }
     </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
+<body class="text-gray-100 min-h-screen flex flex-col overflow-x-hidden">
 
-    <header class="bg-gray-900/90 backdrop-blur border-b border-gray-800 p-4 flex justify-between items-center shadow-lg relative z-20">
-        <h1 class="text-xl font-extrabold text-blue-400 tracking-wider flex items-center gap-2 digital-font">
-            <span class="w-3 h-3 rounded-full bg-blue-500 animate-pulse shadow-[0_0_10px_#3b82f6]"></span>
+    <header class="bg-gray-950/70 backdrop-blur-md border-b border-gray-800/80 px-6 py-4 flex justify-between items-center shadow-lg relative z-20">
+        <h1 class="text-lg md:text-xl font-black text-blue-400 tracking-wider flex items-center gap-3 digital-font">
+            <span class="relative flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>
+            </span>
             EGDESK AI CCTV SYSTEM
         </h1>
-        <nav class="flex gap-1 md:gap-2">
-            <button onclick="showPage('cctv')" class="hover:text-blue-400 font-bold px-3 py-1.5 rounded transition-all text-sm md:text-base">CCTV AI</button>
-            <button onclick="showPage('records')" class="hover:text-blue-400 font-bold px-3 py-1.5 rounded transition-all text-sm md:text-base">녹화정보</button>
-            <button onclick="showPage('events')" class="hover:text-blue-400 font-bold px-3 py-1.5 rounded transition-all text-sm md:text-base">이벤트 정보</button>
-            <button onclick="showPage('settings')" class="hover:text-blue-400 font-bold px-3 py-1.5 rounded transition-all text-sm md:text-base">설정</button>
-        </nav>
+        <div class="flex items-center gap-6">
+            <!-- Persistent Background Recording Indicator -->
+            <div id="bg-rec-status" class="hidden flex items-center gap-2 bg-red-950/30 border border-red-500/30 px-3.5 py-1.5 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                <span class="w-2 h-2 bg-red-500 rounded-full blink shadow-[0_0_8px_#ef4444]"></span>
+                <span class="text-[11px] font-extrabold text-red-400 tracking-wider digital-font uppercase">Background Rec</span>
+            </div>
+            <nav class="flex gap-1 md:gap-3">
+                <button onclick="showPage('cctv')" id="nav-cctv" class="nav-link font-bold px-3 py-1.5 text-sm md:text-base text-gray-400 hover:text-gray-200">CCTV AI</button>
+                <button onclick="showPage('records')" id="nav-records" class="nav-link font-bold px-3 py-1.5 text-sm md:text-base text-gray-400 hover:text-gray-200">녹화정보</button>
+                <button onclick="showPage('events')" id="nav-events" class="nav-link font-bold px-3 py-1.5 text-sm md:text-base text-gray-400 hover:text-gray-200">이벤트 정보</button>
+                <button onclick="showPage('settings')" id="nav-settings" class="nav-link font-bold px-3 py-1.5 text-sm md:text-base text-gray-400 hover:text-gray-200">설정</button>
+            </nav>
+        </div>
     </header>
 
-    <main id="main-content" class="flex-grow p-6 flex flex-col justify-center items-center">
+    <main id="main-content" class="flex-grow p-4 md:p-8 flex flex-col justify-center items-center">
         <!-- CCTV AI 페이지 -->
         <div id="cctv-page" class="page hidden w-full flex flex-col items-center">
-            <!-- CCTV Video Container: Default to 1/2 size (max-w-2xl aspect-video) -->
-            <div id="video-container" class="bg-black rounded-3xl overflow-hidden border-2 border-gray-800 flex items-center justify-center relative transition-all duration-500 ease-in-out w-full max-w-2xl aspect-video shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                <video id="video-stream" class="w-full h-full object-cover" autoplay playsinline></video>
-                <div id="rec-indicator" class="hidden absolute top-4 left-4 flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-full border border-red-500/30">
-                    <div class="recording-icon blink"></div>
-                    <span class="text-xs font-black text-red-500 digital-font tracking-widest">REC</span>
+            <!-- CCTV Video Container: Premium Styled Screen Box -->
+            <div id="video-container" class="bg-gray-950 rounded-2xl overflow-hidden border border-gray-800/80 flex items-center justify-center relative transition-all duration-500 ease-in-out w-full max-w-3xl aspect-video shadow-[0_0_50px_rgba(0,0,0,0.8)] cctv-grid">
+                <!-- CCTV Status watermark -->
+                <div class="absolute top-4 left-4 z-20 flex flex-col gap-1 pointer-events-none select-none">
+                    <div id="rec-indicator" class="hidden flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-md border border-red-500/30">
+                        <div class="recording-icon blink"></div>
+                        <span class="text-xs font-black text-red-500 digital-font tracking-widest">REC</span>
+                    </div>
                 </div>
+                
+                <div class="absolute top-4 right-4 z-20 pointer-events-none select-none">
+                    <span id="cam-timestamp" class="text-xs font-bold text-gray-400 bg-black/60 px-3 py-1.5 rounded-md border border-gray-800 digital-font">CAM_01 | SYSTEM ONLINE</span>
+                </div>
+
+                <video id="video-stream" class="w-full h-full object-cover" autoplay playsinline></video>
                 <div id="focus-frame" class="focus-frame w-24 h-24"></div>
-                <div id="event-beacon" class="hidden absolute top-4 right-4 flex items-center gap-2">
-                    <div class="beacon blink"></div>
-                    <span class="font-extrabold text-red-500 text-sm animate-pulse">이상 감지!</span>
+                
+                <div id="event-beacon" class="hidden absolute inset-0 bg-red-950/20 border-2 border-red-500 animate-pulse pointer-events-none flex items-center justify-center z-10">
+                    <div class="bg-black/85 border border-red-500/50 px-6 py-4 rounded-xl flex items-center gap-4 shadow-2xl">
+                        <div class="beacon blink"></div>
+                        <div class="flex flex-col">
+                            <span class="font-black text-red-500 text-base tracking-widest digital-font">ANOMALY DETECTED</span>
+                            <span class="text-xs text-red-400/90 font-bold">실시간 이상 움직임 감지 진행 중</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Controls with Glowing Electronic Buttons and Bilingual labels -->
-            <div class="mt-8 grid grid-cols-3 md:flex md:flex-wrap gap-4 justify-center w-full max-w-2xl px-4">
-                <button onclick="startCamera()" class="digital-font bg-black/50 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2.5 rounded-2xl flex flex-col items-center shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all active:scale-95 cursor-pointer">
-                    <span class="text-sm font-black tracking-widest uppercase">Start</span>
-                    <span class="text-[10px] text-emerald-300/80 font-bold mt-1 font-sans">시작</span>
-                </button>
-                <button onclick="pauseCamera()" class="digital-font bg-black/50 border border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20 px-4 py-2.5 rounded-2xl flex flex-col items-center shadow-[0_0_15px_rgba(245,158,11,0.1)] hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all active:scale-95 cursor-pointer">
-                    <span class="text-sm font-black tracking-widest uppercase">Pause</span>
-                    <span class="text-[10px] text-yellow-300/80 font-bold mt-1 font-sans">일시정지</span>
-                </button>
-                <button onclick="stopCamera()" class="digital-font bg-black/50 border border-red-500/50 text-red-400 hover:bg-red-500/20 px-4 py-2.5 rounded-2xl flex flex-col items-center shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] transition-all active:scale-95 cursor-pointer">
-                    <span class="text-sm font-black tracking-widest uppercase">Stop</span>
-                    <span class="text-[10px] text-red-300/80 font-bold mt-1 font-sans">중지</span>
-                </button>
-                <button onclick="makeFullScreen()" class="digital-font bg-black/50 border border-blue-500/50 text-blue-400 hover:bg-blue-500/20 px-4 py-2.5 rounded-2xl flex flex-col items-center shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all active:scale-95 cursor-pointer">
-                    <span class="text-sm font-black tracking-widest uppercase">Full</span>
-                    <span class="text-[10px] text-blue-300/80 font-bold mt-1 font-sans">전체화면</span>
-                </button>
-                <button onclick="revertSize()" class="digital-font bg-black/50 border border-teal-500/50 text-teal-400 hover:bg-teal-500/20 px-4 py-2.5 rounded-2xl flex flex-col items-center shadow-[0_0_15px_rgba(20,184,166,0.1)] hover:shadow-[0_0_20px_rgba(20,184,166,0.3)] transition-all active:scale-95 cursor-pointer">
-                    <span class="text-sm font-black tracking-widest uppercase">Revert</span>
-                    <span class="text-[10px] text-teal-300/80 font-bold mt-1 font-sans">나가기</span>
-                </button>
-                <button onclick="exitApp()" class="digital-font bg-black/50 border border-gray-600 text-gray-400 hover:bg-gray-700/20 px-4 py-2.5 rounded-2xl flex flex-col items-center shadow-md transition-all active:scale-95 cursor-pointer col-span-3 md:col-span-1">
-                    <span class="text-sm font-black tracking-widest uppercase">Exit</span>
-                    <span class="text-[10px] text-gray-400/80 font-bold mt-1 font-sans">시스템종료</span>
-                </button>
+            <!-- Sleek Control HUD Panel -->
+            <div class="mt-8 cyber-panel p-6 rounded-2xl w-full max-w-3xl border border-gray-800">
+                <div class="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
+                    <span class="text-xs font-black text-blue-400 tracking-widest uppercase digital-font">Console Controller</span>
+                    <span class="text-xs text-gray-500 font-bold" id="rec-duration-status">녹화 대기 중</span>
+                </div>
+                <div class="grid grid-cols-2 md:flex md:flex-wrap gap-4 justify-center">
+                    <button onclick="startCamera()" class="cyber-btn digital-font border border-emerald-500/30 text-emerald-400 hover:bg-emerald-950/10 hover:border-emerald-400 hover:shadow-[0_0_15px_rgba(16,185,129,0.25)] flex-grow md:flex-none w-auto md:w-32 py-4 px-2 rounded-xl flex flex-col justify-center items-center active:scale-95 cursor-pointer">
+                        <span class="text-sm font-black tracking-widest uppercase">Start</span>
+                        <span class="text-[10px] text-emerald-300/80 font-bold mt-1 font-sans">시작</span>
+                    </button>
+                    <button onclick="pauseCamera()" class="cyber-btn digital-font border border-yellow-500/30 text-yellow-400 hover:bg-yellow-950/10 hover:border-yellow-400 hover:shadow-[0_0_15px_rgba(245,158,11,0.25)] flex-grow md:flex-none w-auto md:w-32 py-4 px-2 rounded-xl flex flex-col justify-center items-center active:scale-95 cursor-pointer">
+                        <span class="text-sm font-black tracking-widest uppercase">Pause</span>
+                        <span class="text-[10px] text-yellow-300/80 font-bold mt-1 font-sans">일시정지</span>
+                    </button>
+                    <button onclick="makeFullScreen()" class="cyber-btn digital-font border border-blue-500/30 text-blue-400 hover:bg-blue-950/10 hover:border-blue-400 hover:shadow-[0_0_15px_rgba(59,130,246,0.25)] flex-grow md:flex-none w-auto md:w-32 py-4 px-2 rounded-xl flex flex-col justify-center items-center active:scale-95 cursor-pointer">
+                        <span class="text-sm font-black tracking-widest uppercase">Full</span>
+                        <span class="text-[10px] text-blue-300/80 font-bold mt-1 font-sans">전체화면</span>
+                    </button>
+                    <button onclick="revertSize()" class="cyber-btn digital-font border border-teal-500/30 text-teal-400 hover:bg-teal-950/10 hover:border-teal-400 hover:shadow-[0_0_15px_rgba(20,184,166,0.25)] flex-grow md:flex-none w-auto md:w-32 py-4 px-2 rounded-xl flex flex-col justify-center items-center active:scale-95 cursor-pointer">
+                        <span class="text-sm font-black tracking-widest uppercase">Revert</span>
+                        <span class="text-[10px] text-teal-300/80 font-bold mt-1 font-sans">나가기</span>
+                    </button>
+                </div>
             </div>
         </div>
 
         <!-- 녹화정보 페이지 -->
         <div id="records-page" class="page hidden w-full max-w-4xl">
-            <h2 class="text-2xl font-black mb-6 text-blue-400 tracking-tight">녹화 저장소</h2>
-            <div class="bg-gray-900 rounded-[32px] p-6 shadow-2xl border border-gray-800">
-                <table class="w-full text-left">
-                    <thead><tr class="text-gray-500 border-b border-gray-800"><th class="p-4 text-xs font-bold uppercase tracking-wider">일시</th><th class="p-4 text-xs font-bold uppercase tracking-wider">파일명</th><th class="p-4 text-xs font-bold uppercase tracking-wider">용량</th><th class="p-4 text-xs font-bold uppercase tracking-wider">기능</th></tr></thead>
-                    <tbody id="record-list"></tbody>
-                </table>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-blue-400 tracking-tight">녹화 보관함 (30분 파일 분할)</h2>
+                <button onclick="loadRecords()" class="bg-gray-900/50 hover:bg-gray-900 px-4 py-2 border border-gray-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"/></svg>
+                    새로고침
+                </button>
+            </div>
+            <div class="cyber-panel rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-gray-500 border-b border-gray-800/80 bg-gray-950/40">
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider">일시</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider">파일명</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider">용량</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider text-right">기능</th>
+                            </tr>
+                        </thead>
+                        <tbody id="record-list" class="divide-y divide-gray-850">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- 이벤트 정보 페이지 -->
         <div id="events-page" class="page hidden w-full max-w-4xl">
-            <h2 class="text-2xl font-black mb-6 text-red-400 tracking-tight">이상 감지 로그</h2>
-            <div class="bg-gray-900 rounded-[32px] p-6 shadow-2xl border border-gray-800">
-                <table class="w-full text-left">
-                    <thead><tr class="text-gray-500 border-b border-gray-800"><th class="p-4 text-xs font-bold uppercase tracking-wider">시간</th><th class="p-4 text-xs font-bold uppercase tracking-wider">유형</th><th class="p-4 text-xs font-bold uppercase tracking-wider">스냅샷</th><th class="p-4 text-xs font-bold uppercase tracking-wider">기능</th></tr></thead>
-                    <tbody id="event-list"></tbody>
-                </table>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-red-400 tracking-tight">지능형 이상 감지 로그</h2>
+                <button onclick="loadEvents()" class="bg-gray-900/50 hover:bg-gray-900 px-4 py-2 border border-gray-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"/></svg>
+                    새로고침
+                </button>
+            </div>
+            <div class="cyber-panel rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-gray-500 border-b border-gray-800/80 bg-gray-950/40">
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider">시간</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider">감지 유형</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider">스냅샷</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider text-right">상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="event-list" class="divide-y divide-gray-850">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- 설정 페이지 -->
         <div id="settings-page" class="page w-full max-w-2xl">
-            <h2 class="text-2xl font-black mb-6 text-gray-300 tracking-tight">시스템 설정</h2>
-            <div class="bg-gray-900 p-8 rounded-[32px] space-y-6 shadow-2xl border border-gray-800">
+            <h2 class="text-2xl font-black mb-6 text-gray-300 tracking-tight">시스템 환경 설정</h2>
+            <div class="cyber-panel p-8 rounded-2xl space-y-6">
                 <div>
-                    <label class="block mb-3 text-gray-400 font-bold text-sm">녹화 저장 폴더 지정:</label>
-                    <div class="flex gap-3">
-                        <input type="text" id="save-path" readonly placeholder="폴더를 선택하세요." class="w-full p-4 bg-gray-950 rounded-2xl border border-gray-800 outline-none text-sm font-bold placeholder:text-gray-600">
-                        <button onclick="selectFolder()" class="bg-blue-600 px-6 py-4 rounded-2xl hover:bg-blue-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_16px_rgba(37,99,235,0.3)]">폴더 선택/생성</button>
+                    <label class="block mb-3 text-gray-400 font-bold text-sm">로컬 녹화 저장 폴더 지정:</label>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" id="save-path" readonly placeholder="CCTV 녹화 파일을 저장할 폴더를 지정해주세요." class="w-full p-4 bg-gray-950 rounded-xl border border-gray-800 outline-none text-sm font-bold text-gray-300 placeholder:text-gray-600 focus:border-blue-500/50 transition-all">
+                        <button onclick="selectFolder()" class="bg-blue-600 px-6 py-4 rounded-xl hover:bg-blue-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_20px_rgba(37,99,235,0.25)]">폴더 지정하기</button>
                     </div>
                 </div>
-                <div id="storage-dashboard" class="hidden mt-6 border-t border-gray-800 pt-6">
-                    <p class="font-black text-lg mb-4 text-blue-400 tracking-tight">스토리지 상태</p>
+                <div id="storage-dashboard" class="hidden mt-6 border-t border-gray-800/80 pt-6">
+                    <p class="font-black text-base mb-4 text-blue-400 tracking-tight digital-font uppercase">Storage Diagnostics</p>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-gray-950 p-6 rounded-2xl border border-gray-800 text-center flex flex-col gap-1"><span class="text-xs font-bold text-gray-500">가용 용량</span><span id="disk-space" class="text-yellow-400 font-extrabold text-2xl digital-font">0</span> <span class="text-xs font-bold text-gray-400 mt-1">GB</span></div>
-                        <div class="bg-gray-950 p-6 rounded-2xl border border-gray-800 text-center flex flex-col gap-1"><span class="text-xs font-bold text-gray-500">예상 녹화 시간</span><span id="rec-time" class="text-green-400 font-extrabold text-2xl digital-font">0</span> <span class="text-xs font-bold text-gray-400 mt-1">분</span></div>
+                        <div class="bg-gray-950/60 p-5 rounded-xl border border-gray-850 text-center flex flex-col gap-1">
+                            <span class="text-xs font-bold text-gray-500">가용 저장 공간</span>
+                            <div>
+                                <span id="disk-space" class="text-yellow-400 font-extrabold text-2xl digital-font">0</span>
+                                <span class="text-xs font-bold text-gray-400 ml-1">GB</span>
+                            </div>
+                        </div>
+                        <div class="bg-gray-950/60 p-5 rounded-xl border border-gray-850 text-center flex flex-col gap-1">
+                            <span class="text-xs font-bold text-gray-500">예상 연속 녹화 시간</span>
+                            <div>
+                                <span id="rec-time" class="text-green-400 font-extrabold text-2xl digital-font">0</span>
+                                <span class="text-xs font-bold text-gray-400 ml-1">분</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </main>
+
+    <!-- Playback Video Modal -->
+    <div id="play-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-950 border border-gray-800/80 w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl relative">
+            <div class="p-5 border-b border-gray-850 flex justify-between items-center bg-gray-900/40">
+                <h3 id="modal-title" class="font-black text-sm md:text-base text-blue-400 tracking-tight digital-font uppercase">CCTV PLAYBACK PORT</h3>
+                <button onclick="closePlayModal()" class="w-8 h-8 rounded-full bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center font-bold transition-colors">✕</button>
+            </div>
+            <div class="aspect-video bg-black relative">
+                <video id="modal-video" class="w-full h-full object-cover" controls autoplay>
+                    <source src="https://assets.mixkit.co/videos/preview/mixkit-security-camera-footage-of-a-corridor-in-a-building-42171-large.mp4" type="video/mp4">
+                    브라우저가 비디오 재생을 지원하지 않습니다.
+                </video>
+            </div>
+        </div>
+    </div>
 
     <script>
         let isConfigured = false;
@@ -127,19 +288,60 @@
         let detectionInterval = null;
         let lastEventTime = 0;
         let recStartTime = null;
+        let recSessionId = null;
+        let isRecording = false; 
         let alarmSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
         alarmSound.loop = true;
+        
+        let liveDurationInterval = null;
+
+        // Restore configuration on startup
+        window.addEventListener('DOMContentLoaded', () => {
+            // Keep dynamic clock ticking for security style
+            setInterval(() => {
+                const now = new Date();
+                const timeStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+                const statusEl = document.getElementById('cam-timestamp');
+                if (statusEl) {
+                    statusEl.innerText = `CAM_01 | ${timeStr}`;
+                }
+            }, 1000);
+
+            // Periodically sync recording to SQLite DB
+            setInterval(() => {
+                if (isRecording) {
+                    syncRecordingProgress();
+                }
+            }, 5000);
+
+            const savedPath = localStorage.getItem('cctv_save_path');
+            if (savedPath) {
+                document.getElementById('save-path').value = savedPath;
+                isConfigured = true;
+                document.getElementById('storage-dashboard').classList.remove('hidden');
+                updateStorageMetrics();
+                showPage('cctv');
+                
+                // Immediately start CCTV camera as per requirement:
+                // "설정에서 한번 폴더가 설정되면 그 다음에는 설정하지 않아도 바로 CCTV 카메라가 작동하도록 한다."
+                startCamera();
+            } else {
+                showPage('settings');
+            }
+        });
 
         async function selectFolder() {
             try {
                 const dirHandle = await window.showDirectoryPicker();
                 document.getElementById('save-path').value = dirHandle.name;
                 isConfigured = true;
+                localStorage.setItem('cctv_save_path', dirHandle.name);
                 document.getElementById('storage-dashboard').classList.remove('hidden');
                 updateStorageMetrics();
                 alert("폴더가 설정되었습니다.");
                 showPage('cctv');
-            } catch (err) { console.log("취소됨", err); }
+                startCamera();
+            } catch (err) { console.log("폴더 취소됨", err); }
         }
 
         function updateStorageMetrics() {
@@ -153,10 +355,17 @@
                 id = 'settings';
             }
             document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active-tab'));
+            
             document.getElementById(id + '-page').classList.remove('hidden');
+            const navLink = document.getElementById('nav-' + id);
+            if (navLink) navLink.classList.add('active-tab');
 
             if (id === 'records') {
-                loadRecords();
+                // Clicking Records tab triggers a sync first so that 30-minute block lists are updated
+                syncRecordingProgress().then(() => {
+                    loadRecords();
+                });
             } else if (id === 'events') {
                 loadEvents();
             }
@@ -164,18 +373,51 @@
 
         async function startCamera() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-                document.getElementById('video-stream').srcObject = stream;
+                if (!stream) {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                    document.getElementById('video-stream').srcObject = stream;
+                }
+                
+                // Play stream visualization
+                document.getElementById('video-stream').play();
+                
                 document.getElementById('rec-indicator').classList.remove('hidden');
-                recStartTime = new Date();
+                document.getElementById('bg-rec-status').classList.remove('hidden');
+                
+                if (!isRecording) {
+                    recStartTime = new Date();
+                    recSessionId = Date.now().toString();
+                    isRecording = true;
+                }
+                
                 startDetection();
-            } catch(e) { alert("카메라 접근 불가"); }
+                startDurationCounter();
+            } catch(e) { 
+                console.error("Camera error:", e);
+                alert("카메라 접근 불가 - 권한을 확인해주세요."); 
+            }
+        }
+
+        function startDurationCounter() {
+            if (liveDurationInterval) clearInterval(liveDurationInterval);
+            const statusEl = document.getElementById('rec-duration-status');
+            liveDurationInterval = setInterval(() => {
+                if (isRecording && recStartTime) {
+                    const elapsed = Math.floor((new Date() - recStartTime) / 1000);
+                    const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+                    const mins = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+                    const secs = String(elapsed % 60).padStart(2, '0');
+                    statusEl.innerText = `REC RUNNING: ${hours}:${mins}:${secs}`;
+                } else {
+                    statusEl.innerText = "녹화 대기 중";
+                }
+            }, 1000);
         }
 
         function startDetection() {
             if (detectionInterval) clearInterval(detectionInterval);
             detectionInterval = setInterval(async () => {
-                const isAnomaly = Math.random() > 0.6;
+                const isAnomaly = Math.random() > 0.7;
                 const focusFrame = document.getElementById('focus-frame');
                 const eventBeacon = document.getElementById('event-beacon');
 
@@ -186,7 +428,6 @@
                     eventBeacon.classList.remove('hidden');
                     try { alarmSound.play(); } catch(e) {}
 
-                    // Log event (Throttle to 8 seconds)
                     const now = Date.now();
                     if (now - lastEventTime > 8000) {
                         lastEventTime = now;
@@ -197,7 +438,7 @@
                     eventBeacon.classList.add('hidden');
                     alarmSound.pause();
                 }
-            }, 2500);
+            }, 3000);
         }
 
         async function recordAnomalyEvent() {
@@ -229,46 +470,94 @@
             } catch (err) { console.error('Failed to save event to DB', err); }
         }
 
+        async function syncRecordingProgress() {
+            if (!isRecording || !recStartTime || !recSessionId) return;
+
+            const now = new Date();
+            const diffMs = now - recStartTime;
+            const seconds = Math.floor(diffMs / 1000);
+            
+            const recordsToSync = [];
+            // Split into 30-minute blocks (1800 seconds)
+            const blocksCount = Math.max(1, Math.ceil(seconds / 1800));
+            
+            for (let i = 0; i < blocksCount; i++) {
+                const blockStart = new Date(recStartTime.getTime() + i * 30 * 60 * 1000);
+                let durationInSecs = 1800;
+                if (i === blocksCount - 1) {
+                    durationInSecs = seconds - (i * 1800);
+                }
+                
+                const size = (durationInSecs * 0.1).toFixed(1) + " MB";
+                
+                // Construct filename like REC_20260603_1200_Part1.mp4
+                const blockDateStr = blockStart.getFullYear() + 
+                    String(blockStart.getMonth()+1).padStart(2,'0') + 
+                    String(blockStart.getDate()).padStart(2,'0') + "_" + 
+                    String(blockStart.getHours()).padStart(2,'0') + 
+                    String(blockStart.getMinutes()).padStart(2,'0');
+                const filename = `REC_${blockDateStr}_Part${i+1}.mp4`;
+                
+                recordsToSync.push({
+                    date: blockStart.toLocaleString(),
+                    filename,
+                    size,
+                    url: 'https://assets.mixkit.co/videos/preview/mixkit-security-camera-footage-of-a-corridor-in-a-building-42171-large.mp4'
+                });
+            }
+
+            try {
+                await fetch('../api/cctv/records', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sync: true,
+                        records: recordsToSync
+                    })
+                });
+            } catch(err) {
+                console.error('Failed syncing blocks to DB', err);
+            }
+        }
+
         async function stopCamera() {
             if (detectionInterval) {
                 clearInterval(detectionInterval);
                 detectionInterval = null;
             }
+            if (liveDurationInterval) {
+                clearInterval(liveDurationInterval);
+                liveDurationInterval = null;
+            }
+            
             document.getElementById('focus-frame').style.display = 'none';
             document.getElementById('event-beacon').classList.add('hidden');
             alarmSound.pause();
 
+            document.getElementById('rec-indicator').classList.add('hidden');
+            document.getElementById('bg-rec-status').classList.add('hidden');
+
             if (stream) {
                 stream.getTracks().forEach(t => t.stop());
                 stream = null;
-                document.getElementById('rec-indicator').classList.add('hidden');
-
-                // Save recording log
-                if (recStartTime) {
-                    const now = new Date();
-                    const diffSec = Math.max(1, Math.floor((now - recStartTime) / 1000));
-                    const size = (diffSec * (Math.random() * 0.5 + 0.2)).toFixed(2) + " MB";
-                    const filename = `REC_${recStartTime.getFullYear()}${String(recStartTime.getMonth()+1).padStart(2,'0')}${String(recStartTime.getDate()).padStart(2,'0')}_${String(recStartTime.getHours()).padStart(2,'0')}${String(recStartTime.getMinutes()).padStart(2,'0')}.mp4`;
-                    
-                    try {
-                        await fetch('../api/cctv/records', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                date: recStartTime.toLocaleString(),
-                                filename,
-                                size,
-                                url: '#'
-                            })
-                        });
-                    } catch(err) { console.error('Failed to save recording to DB', err); }
-                    recStartTime = null;
-                }
+                document.getElementById('video-stream').srcObject = null;
             }
+
+            // Sync one final time to capture all blocks before clearing state
+            if (isRecording) {
+                await syncRecordingProgress();
+                isRecording = false;
+                recStartTime = null;
+                recSessionId = null;
+            }
+            
+            document.getElementById('rec-duration-status').innerText = "녹화 중지됨";
         }
 
         function pauseCamera() {
+            // Pause stream visualization, update status
             document.getElementById('video-stream').pause();
+            document.getElementById('rec-duration-status').innerText = "일시정지 상태";
         }
 
         function exitApp() {
@@ -276,22 +565,37 @@
             alert("CCTV 시스템을 종료합니다.");
         }
 
-        // Toggles size between default 1/2 size and full size
         function makeFullScreen() {
             const container = document.getElementById('video-container');
-            container.classList.remove('max-w-2xl');
-            container.classList.add('max-w-full', 'h-[75vh]');
+            container.classList.remove('max-w-3xl');
+            container.classList.add('max-w-full', 'h-[80vh]');
         }
 
         function revertSize() {
             const container = document.getElementById('video-container');
-            container.classList.remove('max-w-full', 'h-[75vh]');
-            container.classList.add('max-w-2xl');
+            container.classList.remove('max-w-full', 'h-[80vh]');
+            container.classList.add('max-w-3xl');
+        }
+
+        function playVideo(url, filename) {
+            const modal = document.getElementById('play-modal');
+            const video = document.getElementById('modal-video');
+            document.getElementById('modal-title').innerText = `CCTV PLAYBACK | ${filename}`;
+            video.src = url;
+            video.load();
+            modal.classList.remove('hidden');
+        }
+
+        function closePlayModal() {
+            const modal = document.getElementById('play-modal');
+            const video = document.getElementById('modal-video');
+            video.pause();
+            modal.classList.add('hidden');
         }
 
         async function loadRecords() {
             const list = document.getElementById('record-list');
-            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">데이터 로딩 중...</td></tr>`;
+            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500 font-bold">데이터 분석 및 동기화 중...</td></tr>`;
 
             try {
                 const res = await fetch('../api/cctv/records');
@@ -300,29 +604,29 @@
                     list.innerHTML = "";
                     data.rows.forEach(r => {
                         const tr = document.createElement('tr');
-                        tr.className = "border-b border-gray-800 hover:bg-gray-900 transition-colors";
+                        tr.className = "border-b border-gray-850 hover:bg-gray-900/30 transition-colors";
                         tr.innerHTML = `
-                            <td class="p-4 text-sm text-gray-400">${r.date}</td>
-                            <td class="p-4 text-sm font-bold text-gray-300">${r.filename}</td>
-                            <td class="p-4 text-sm text-yellow-500 font-bold digital-font">${r.size}</td>
-                            <td class="p-4 text-sm">
-                                <button class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-xl text-xs font-black transition-all">재생</button>
+                            <td class="p-4 text-sm text-gray-400 font-medium">${r.date}</td>
+                            <td class="p-4 text-sm font-bold text-gray-300 digital-font">${r.filename}</td>
+                            <td class="p-4 text-sm text-yellow-500 font-extrabold digital-font">${r.size}</td>
+                            <td class="p-4 text-sm text-right">
+                                <button onclick="playVideo('${r.url || 'https://assets.mixkit.co/videos/preview/mixkit-security-camera-footage-of-a-corridor-in-a-building-42171-large.mp4'}', '${r.filename}')" class="bg-blue-600 hover:bg-blue-500 hover:shadow-[0_0_12px_rgba(59,130,246,0.3)] text-white px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95">재생</button>
                             </td>
                         `;
                         list.appendChild(tr);
                     });
                     if (data.rows.length === 0) {
-                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-600">저장된 녹화 정보가 없습니다.</td></tr>`;
+                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-600 font-bold">저장된 녹화 정보가 없습니다.</td></tr>`;
                     }
                 }
             } catch(e) {
-                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500">불러오기 실패</td></tr>`;
+                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500 font-bold">기록 불러오기 실패</td></tr>`;
             }
         }
 
         async function loadEvents() {
             const list = document.getElementById('event-list');
-            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">데이터 로딩 중...</td></tr>`;
+            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500 font-bold">이벤트 로그 읽는 중...</td></tr>`;
 
             try {
                 const res = await fetch('../api/cctv/events');
@@ -331,29 +635,30 @@
                     list.innerHTML = "";
                     data.rows.forEach(r => {
                         const tr = document.createElement('tr');
-                        tr.className = "border-b border-gray-800 hover:bg-gray-900 transition-colors";
+                        tr.className = "border-b border-gray-850 hover:bg-gray-900/30 transition-colors";
                         tr.innerHTML = `
-                            <td class="p-4 text-sm text-gray-400">${r.timestamp}</td>
-                            <td class="p-4 text-sm text-red-400 font-bold">${r.type}</td>
-                            <td class="p-4">
-                                ${r.snapshot ? `<img src="${r.snapshot}" class="w-20 h-12 object-cover rounded border border-gray-700 cursor-pointer hover:scale-250 transition-all"/>` : 'N/A'}
+                            <td class="p-4 text-sm text-gray-400 font-medium">${r.timestamp}</td>
+                            <td class="p-4 text-sm text-red-400 font-black flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
+                                ${r.type}
                             </td>
-                            <td class="p-4 text-sm">
-                                <button class="bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded-xl text-xs font-black transition-all">분석</button>
+                            <td class="p-4">
+                                ${r.snapshot ? `<img src="${r.snapshot}" class="w-20 h-11 object-cover rounded border border-gray-800 cursor-pointer hover:scale-150 transition-all hover:border-red-500/50 shadow-md"/>` : 'N/A'}
+                            </td>
+                            <td class="p-4 text-sm text-right">
+                                <span class="bg-red-950/40 border border-red-800/50 text-red-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">Warning</span>
                             </td>
                         `;
                         list.appendChild(tr);
                     });
                     if (data.rows.length === 0) {
-                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-600">감지된 이상 이벤트가 없습니다.</td></tr>`;
+                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-600 font-bold">감지된 이상 이벤트가 없습니다.</td></tr>`;
                     }
                 }
             } catch(e) {
-                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500">불러오기 실패</td></tr>`;
+                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500 font-bold">이벤트 불러오기 실패</td></tr>`;
             }
         }
-        
-        showPage('settings');
     </script>
 </body>
 </html>
