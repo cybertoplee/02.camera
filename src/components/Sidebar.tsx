@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Zap, UserPlus, MonitorPlay, ClipboardList, Users, Coins, Settings, User, Lock, LogIn, LogOut } from 'lucide-react';
+import { Zap, UserPlus, MonitorPlay, ClipboardList, Users, Coins, Settings, User, Lock, LogIn, LogOut, Video } from 'lucide-react';
 
 export default function Sidebar() {
   const [username, setUsername] = useState("");
@@ -153,6 +153,7 @@ export default function Sidebar() {
         
         <div style={{ margin: '16px 0', borderTop: '1px solid #F1F5F9' }}></div>
         
+        {renderMenuItem("/cctv", Video, "CCTV AI", "#EF4444")}
         {renderMenuItem("/admin/settings", Settings, "시스템 설정", "#94A3B8")}
       </nav>
 
