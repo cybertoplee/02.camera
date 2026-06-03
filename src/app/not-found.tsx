@@ -12,9 +12,6 @@ export default function NotFound() {
       <p className="text-2xl text-[#94A3B8] mb-8">
         페이지를 찾을 수 없습니다: <span className="text-white font-mono">{pathname}</span>
       </p>
-      <div className="text-sm text-[#475569] mb-8">
-        Base Path: {process.env.NEXT_PUBLIC_BASE_PATH || 'Not Set'}
-      </div>
       <Link href="/">
         <button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white px-8 py-3 rounded-xl font-bold transition-all">
           홈으로 돌아가기

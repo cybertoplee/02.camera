@@ -22,10 +22,11 @@ export default function ClientRegisterForm({ classes, customFields, error }: { c
     const loadFaceApi = async () => {
       try {
         setProcessStatus('AI 엔진 로드중...');
+        const basePath = process.env.NEXT_PUBLIC_EGDESK_BASE_PATH || '';
         if (!(window as any).faceapi) {
           await new Promise<void>((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = '/js/face-api.js';
+            script.src = `${basePath}/js/face-api.js`;
             script.async = true;
             script.onload = () => resolve();
             script.onerror = () => reject(new Error('Failed to load face-api.js'));
@@ -35,7 +36,7 @@ export default function ClientRegisterForm({ classes, customFields, error }: { c
 
         setProcessStatus('AI 모델 로드중...');
         const faceapi = (window as any).faceapi;
-        const MODEL_URL = '/models/';
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),

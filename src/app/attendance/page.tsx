@@ -7,6 +7,7 @@ import { ArrowLeft, User, TriangleAlert, CheckCircle, Loader2, MonitorPlay, User
 // import * as faceapi from '@vladmandic/face-api'; // 제거 후 useEffect 내 동적 임포트 사용
 import { queryTable, insertRows, aggregateTable, executeSQL } from '@root/egdesk-helpers';
 import { sendAttendanceSMSAction } from '../actions/sms';
+import { apiFetch } from '@/lib/api';
 
 interface Student {
   id: number;
@@ -147,7 +148,7 @@ export default function AttendanceMonitorPage() {
     // 2. Fetch Data from DB
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/attendance_init');
+        const res = await apiFetch('/api/attendance_init');
         if (!res.ok) throw new Error('API request failed');
         const data = await res.json();
         

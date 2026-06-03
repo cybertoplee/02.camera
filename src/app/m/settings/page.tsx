@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Bell, Smartphone, Palette, HelpCircle, ChevronRight, HardDrive, Users, Trash2, PlusCircle, RefreshCw, Clock, Save, ScanFace, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { queryTable, insertRows, deleteRows } from '@root/egdesk-helpers';
+import { apiFetch } from '@/lib/api';
 
 export default function MobileSettingsPage() {
   const [mounted, setMounted] = useState(false);
@@ -42,7 +43,7 @@ export default function MobileSettingsPage() {
       if (checkout) setAutoCheckoutMinutes(Number(checkout.value));
 
       // Fetch Usage Statistics
-      const usageRes = await fetch('/api/settings/usage');
+      const usageRes = await apiFetch('/api/settings/usage');
       if (usageRes.ok) {
         const usageData = await usageRes.json();
         setUsageStats({ faceAuthCount: usageData.faceAuthCount || 0, smsCount: usageData.smsCount || 0 });

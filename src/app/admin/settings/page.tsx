@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Bot, Users, Trash2, PlusCircle, MessageSquare, Send } from 'lucide-react';
 import { queryTable, insertRows, deleteRows, createTable } from '@root/egdesk-helpers';
 import { sendAttendanceSMSAction } from '../../actions/sms';
+import { apiFetch } from '@/lib/api';
 
 export default function SettingsPage() {
   const [status, setStatus] = useState('');
@@ -45,7 +46,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchUsageStats = async () => {
       try {
-        const res = await fetch('/api/settings/usage');
+        const res = await apiFetch('/api/settings/usage');
         const data = await res.json();
         if (data.success) {
           setUsageStats({ faceCount: data.faceCount, smsCount: data.smsCount, currentMonth: data.currentMonth });
@@ -430,7 +431,7 @@ export default function SettingsPage() {
                   if (confirm('새 창이 열립니다. (작업 표시줄에서 확인 하세요). 로그인을 완료해 주세요.')) {
                     setStatus('기기 연동 대기 중...');
                     try {
-                      const res = await fetch('/api/sms/setup');
+                      const res = await apiFetch('/api/sms/setup');
                       const data = await res.json();
                       
                       if (res.ok) {

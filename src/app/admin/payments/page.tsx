@@ -20,6 +20,7 @@ import {
   deleteRowsAction 
 } from './actions';
 import { matchChosung } from '@/utils/koreanUtils';
+import { apiFetch } from '@/lib/api';
 
 interface PaymentRecord {
   id: number;
@@ -117,7 +118,7 @@ export default function PaymentManagementPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/payments/sync');
+      const res = await apiFetch('/api/payments/sync');
       const data = await res.json();
       if (data.success) {
         alert(`${data.processedCount}건의 내역을 동기화했습니다.`);
