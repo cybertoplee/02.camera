@@ -7,7 +7,7 @@ import Sidebar from './Sidebar';
 export default function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isMobileRoute = pathname.startsWith('/m');
-  const isAttendance = pathname === '/attendance';
+  const isNoPaddingPage = pathname === '/attendance' || pathname === '/cctv';
 
   if (isMobileRoute) {
     return <>{children}</>;
@@ -50,8 +50,8 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
       <main 
         key={pathname}
         style={{ 
-          padding: isAttendance ? '0' : '48px', 
-          overflowY: isAttendance ? 'hidden' : 'auto',
+          padding: isNoPaddingPage ? '0' : '48px', 
+          overflowY: isNoPaddingPage ? 'hidden' : 'auto',
           animation: 'fadeInSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards'
         }}
       >

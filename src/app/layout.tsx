@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EG DESK | AI Taekwondo Management",
-  description: "AI-powered Taekwondo management system",
+  title: "EGDesk | AI 출결 및 CCTV 시스템",
+  description: "AI 기반 스마트 출결 및 CCTV 관제 시스템",
 };
 
 export const viewport = {

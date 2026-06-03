@@ -138,7 +138,7 @@ export default function Sidebar() {
               gap: '4px'
             }}>
               <span style={{ width: '4px', height: '4px', backgroundColor: '#3B82F6', borderRadius: '50%' }}></span>
-              팀일도킥복싱멀티짐
+              AI 출결 & CCTV 관제
             </div>
           </div>
         </div>

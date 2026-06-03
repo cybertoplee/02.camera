@@ -14,7 +14,7 @@ export default function CCTVPage() {
   const basePath = process.env.NEXT_PUBLIC_EGDESK_BASE_PATH || '';
 
   return (
-    <div style={{ width: '100%', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100vh', overflow: 'hidden' }}>
       <iframe
         src={`${basePath}/cctv/index.html`}
         style={{ width: '100%', height: '100%', border: 'none' }}
