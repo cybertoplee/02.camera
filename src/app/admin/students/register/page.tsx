@@ -11,6 +11,8 @@ interface CustomField {
   display_name: string;
 }
 
+import { useCamera } from '@/lib/useCamera';
+
 export default function StudentRegisterPage() {
   const [formData, setFormData] = useState<any>({
     name: '',
@@ -29,7 +31,8 @@ export default function StudentRegisterPage() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [status, setStatus] = useState('AI 모델 로딩 중...');
-  const [isCameraOn, setIsCameraOn] = useState(false);
+  const { stream, error: camError, start, stop, toggle } = useCamera();
+  const isCameraOn = !!stream;
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,6 +40,16 @@ export default function StudentRegisterPage() {
   const [mounted, setMounted] = useState(false);
   const isPageMounted = useRef(true);
   const faceapiRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream || null;
+    }
+  }, [stream]);
+
+const initDatabase = async () => {
+  // No table creation here; tables should be pre-initialized.
+};
 
   useEffect(() => {
     isPageMounted.current = true;
@@ -63,12 +76,15 @@ export default function StudentRegisterPage() {
       }
     };
     loadModels();
-    fetchCustomFields();
-    fetchClasses();
+    // Ensure tables exist before fetching data
+    initDatabase().then(() => {
+      fetchCustomFields();
+      fetchClasses();
+    });
 
     return () => {
       isPageMounted.current = false;
-      stopVideo();
+      stop();
     };
   }, []);
 
@@ -86,71 +102,26 @@ export default function StudentRegisterPage() {
     }
   };
 
-  const fetchCustomFields = async () => {
-    try {
-      const res = await queryTable('custom_fields');
-      const fields = res.rows || [];
-      setCustomFields(fields);
-      
-      const initialCustomData: any = {};
-      fields.forEach((field: CustomField) => {
-        initialCustomData[field.field_name] = '';
-      });
-      setFormData((prev: any) => ({ ...prev, ...initialCustomData }));
-    } catch (err) {
-      console.error('커스텀 필드 로드 실패:', err);
-    }
-  };
+const fetchCustomFields = async () => {
+  try {
+    const res = await queryTable('custom_fields');
+    const fields = res.rows || [];
+    setCustomFields(fields);
 
-  const stopVideo = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      const tracks = stream.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-      console.log('Webcam stream stopped');
-    }
-  };
+    // Initialize form data for custom fields
+    const initialCustomData: any = {};
+    fields.forEach((field: CustomField) => {
+      initialCustomData[field.field_name] = '';
+    });
+    setFormData((prev: any) => ({ ...prev, ...initialCustomData }));
+  } catch (err: any) {
+    console.error('커스텀 필드 로드 실패:', err);
+  }
+};
 
-  const startVideo = async () => {
-    if (!isPageMounted.current) return;
-    if (videoRef.current?.srcObject) return;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 640 }, 
-          height: { ideal: 480 },
-          facingMode: 'user'
-        } 
-      });
-      
-      if (!isPageMounted.current) {
-        stream.getTracks().forEach(track => track.stop());
-        return;
-      }
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setStatus('');
-      }
-    } catch (err) {
-      console.error('Webcam access failed:', err);
-      if (isPageMounted.current) {
-        setStatus('웹캠을 찾을 수 없습니다.');
-      }
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
-  };
-
-  const toggleCamera = () => {
+  const toggleCamera = async () => {
     if (isCameraOn) {
-      stopVideo();
-      setIsCameraOn(false);
+      stop();
       setStatus('');
       setIsFaceDetected(false);
       if (canvasRef.current) {
@@ -164,11 +135,22 @@ export default function StudentRegisterPage() {
         alert('학생 이름을 입력해주세요.');
         return;
       }
-      setIsCameraOn(true);
       setStatus('카메라 켜는 중...');
-      startVideo();
+      try {
+        await start();
+        setStatus('');
+      } catch (err: any) {
+        setStatus(`카메라 접근 실패: ${err.message}`);
+      }
     }
   };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev: any) => ({ ...prev, [name]: value }));
+  };
+
+
 
   // Face Tracking Loop
   useEffect(() => {
@@ -181,7 +163,7 @@ export default function StudentRegisterPage() {
         return;
       }
       
-      if (videoRef.current.readyState < 2) {
+      if (!videoRef.current || videoRef.current.readyState < 2 || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
         if (isActive) timeoutId = setTimeout(trackFace, 30);
         return;
       }
@@ -244,8 +226,7 @@ export default function StudentRegisterPage() {
     if (!formData.name) {
       alert('학생 이름을 입력해주세요.');
       // 이전 입력 상태로 이동 (카메라 끄기 및 입력 폼 표시)
-      stopVideo();
-      setIsCameraOn(false);
+      stop();
       setIsFaceDetected(false);
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
@@ -254,7 +235,10 @@ export default function StudentRegisterPage() {
       return;
     }
 
-    if (!videoRef.current) return;
+    if (!videoRef.current || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
+      setStatus('카메라 화면이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
 
     setIsCapturing(true);
     setStatus('얼굴 특징 분석 중...');
@@ -334,8 +318,7 @@ export default function StudentRegisterPage() {
       alert(`${formData.name} 학생이 성공적으로 등록되었습니다.`);
       
       // 카메라 끄기 및 상태 초기화
-      stopVideo();
-      setIsCameraOn(false);
+      stop();
       setIsFaceDetected(false);
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
@@ -414,25 +397,31 @@ export default function StudentRegisterPage() {
             </div>
 
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">학부모 성함</label>
-              <input
-                name="parentName"
-                value={formData.parentName}
-                onChange={handleInputChange}
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm"
-                placeholder="학부모 성함을 입력하세요"
-              />
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">수신자 성명</label>
+                <input
+                  name="parentName"
+                  value={formData.parentName}
+                  onChange={handleInputChange}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm"
+                  placeholder="수신자 성명을 입력하세요"
+                />
             </div>
 
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">학부모 연락처</label>
-              <input
-                name="parentPhone"
-                value={formData.parentPhone}
-                onChange={handleInputChange}
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm"
-                placeholder="010-0000-0000"
-              />
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">수신자 연락처</label>
+                <input
+                  name="parentPhone"
+                  value={formData.parentPhone}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    let formatted = raw;
+                    if (raw.length > 3) formatted = raw.slice(0, 3) + "-" + raw.slice(3);
+                    if (raw.length > 7) formatted = formatted.slice(0, 8) + "-" + raw.slice(7);
+                    setFormData((prev: any) => ({ ...prev, parentPhone: formatted }));
+                  }}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm"
+                  placeholder="010-0000-0000"
+                />
             </div>
 
             <div className="flex flex-col gap-2 group">
@@ -446,7 +435,7 @@ export default function StudentRegisterPage() {
                     onChange={(e) => setFormData((prev: any) => ({ ...prev, receiveSmsIn: e.target.checked }))}
                     className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
-                  <span className="font-bold text-slate-700">등원 받기</span>
+                  <span className="font-bold text-slate-700">출근알림</span>
                 </label>
                 <label className="flex-1 flex items-center justify-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 transition-all hover:bg-slate-100 cursor-pointer shadow-sm">
                   <input
@@ -456,24 +445,24 @@ export default function StudentRegisterPage() {
                     onChange={(e) => setFormData((prev: any) => ({ ...prev, receiveSmsOut: e.target.checked }))}
                     className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
-                  <span className="font-bold text-slate-700">하원 받기</span>
+                  <span className="font-bold text-slate-700">퇴근알림</span>
                 </label>
               </div>
             </div>
 
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">급/단</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">소속</label>
               <input
                 name="rank"
                 value={formData.rank}
                 onChange={handleInputChange}
                 className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm"
-                placeholder="예: 1급, 2단"
+                placeholder="예: 팀장,과장,대표"
               />
             </div>
 
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">반 선택</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">직책/직급</label>
               <select
                 name="classId"
                 value={formData.classId}

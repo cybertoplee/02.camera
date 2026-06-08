@@ -1,4 +1,4 @@
-const { deleteTable, listTables, createTable, queryTable, insertRows } = require('./egdesk-helpers');
+const { deleteTable, listTables, createTable, queryTable, insertRows } = require('./egdesk-helpers.ts');
 
 async function setupDatabase() {
   console.log('Starting database setup...');
@@ -119,13 +119,41 @@ async function setupDatabase() {
     console.error('Error during setup step:', e.message);
   }
 
+  // 8. CCTV Records Table
+  try {
+    await createTable('CCTV 녹화 기록', [
+      { name: 'id', type: 'INTEGER', notNull: true },
+      { name: 'date', type: 'TEXT', notNull: true },
+      { name: 'filename', type: 'TEXT', notNull: true },
+      { name: 'size', type: 'TEXT', notNull: true },
+      { name: 'url', type: 'TEXT', notNull: true }
+    ], { tableName: 'cctv_records', uniqueKeyColumns: ['id'] });
+    console.log('Table "cctv_records" created.');
+  } catch (e) {
+    console.error('Error creating cctv_records table:', e.message);
+  }
+
+  // 9. CCTV Events Table
+  try {
+    await createTable('CCTV 이벤트 로그', [
+      { name: 'id', type: 'INTEGER', notNull: true },
+      { name: 'timestamp', type: 'TEXT', notNull: true },
+      { name: 'type', type: 'TEXT', notNull: true },
+      { name: 'snapshot', type: 'TEXT' },
+      { name: 'video_url', type: 'TEXT' }
+    ], { tableName: 'cctv_events', uniqueKeyColumns: ['id'] });
+    console.log('Table "cctv_events" created.');
+  } catch (e) {
+    console.error('Error creating cctv_events table:', e.message);
+  }
+
   console.log('Database setup complete.');
 }
 
 async function resetAndSetup() {
   console.log('Fetching tables...');
   const res = await listTables();
-  const tablesToReset = ['students', 'classes', 'attendance_logs', 'payment_records', 'student_classes', 'custom_fields', 'tkd_system_settings'];
+  const tablesToReset = ['students', 'classes', 'attendance_logs', 'payment_records', 'student_classes', 'custom_fields', 'tkd_system_settings', 'cctv_records', 'cctv_events'];
   
   for (const tableName of tablesToReset) {
     if (res.tables.find(t => t.tableName === tableName)) {

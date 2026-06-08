@@ -43,7 +43,7 @@ export default function AttendanceManagementPage() {
 
   const handleBatchProcess = async (type: 'IN' | 'OUT', targetStudentIds: number[]) => {
     if (targetStudentIds.length === 0) return;
-    if (!confirm(`${targetStudentIds.length}명의 관원을 일괄 ${type === 'IN' ? '등원' : '하원'} 처리하시겠습니까?${sendSmsOnBatch ? '\n문자 발송이 설정된 관원은 자동으로 문자가 발송됩니다.' : ''}`)) return;
+    if (!confirm(`${targetStudentIds.length}명의 회원을 일괄 ${type === 'IN' ? '등원' : '하원'} 처리하시겠습니까?${sendSmsOnBatch ? '\n문자 발송이 설정된 회원은 자동으로 문자가 발송됩니다.' : ''}`)) return;
 
     setIsProcessing(true);
     try {
@@ -109,11 +109,16 @@ export default function AttendanceManagementPage() {
     setLoading(true);
     setSelectedIds([]);
     try {
-      const classesRes = await queryTable('student_classes');
+      // Load class map; if table missing, use empty map
       const cmap: Record<number, string> = {};
-      classesRes.rows?.forEach((cls: any) => {
-        cmap[cls.id] = cls.name;
-      });
+      try {
+        const classesRes = await queryTable('student_classes');
+        classesRes.rows?.forEach((cls: any) => {
+          cmap[cls.id] = cls.name;
+        });
+      } catch (err) {
+        console.warn('student_classes table not found – proceeding with empty class map');
+      }
       setClassMap(cmap);
 
       const studentsRes = await queryTable('students');
@@ -194,7 +199,7 @@ export default function AttendanceManagementPage() {
     const daysInMonth = new Date(year, month, 0).getDate();
     
     // 헤더 생성
-    const headers = ['관원 이름', '수련반', '등원횟수'];
+    const headers = ['회원 이름', '수련반', '등원횟수'];
     for (let i = 1; i <= daysInMonth; i++) {
       headers.push(`${i}일`);
     }
@@ -340,7 +345,7 @@ export default function AttendanceManagementPage() {
             />
             <input 
               type="text" 
-              placeholder="관원명 검색..."
+              placeholder="회원명 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ 
@@ -429,7 +434,7 @@ export default function AttendanceManagementPage() {
                   transition: 'all'
                 }}
               >
-                미등원
+                미출근
               </button>
               <button 
                 onClick={() => setFilterMode('not_out')}
@@ -446,7 +451,7 @@ export default function AttendanceManagementPage() {
                   transition: 'all'
                 }}
               >
-                미하원
+                미퇴근
               </button>
             </div>
           )}
@@ -532,7 +537,7 @@ export default function AttendanceManagementPage() {
               disabled={isProcessing}
               style={{ padding: '12px 24px', backgroundColor: '#10B981', color: '#FFFFFF', borderRadius: '16px', border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'all' }}
             >
-              {isProcessing ? '처리 중...' : `선택 관원 등원 처리 (${selectedIds.length})`}
+              {isProcessing ? '처리 중...' : `선택 회원 등원 처리 (${selectedIds.length})`}
             </button>
           )}
 
@@ -546,7 +551,7 @@ export default function AttendanceManagementPage() {
               disabled={isProcessing}
               style={{ padding: '12px 24px', backgroundColor: '#3B82F6', color: '#FFFFFF', borderRadius: '16px', border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)', transition: 'all' }}
             >
-              {isProcessing ? '처리 중...' : `선택 관원 하원 처리 (${selectedIds.length})`}
+              {isProcessing ? '처리 중...' : `선택 회원 하원 처리 (${selectedIds.length})`}
             </button>
           )}
 
@@ -561,11 +566,11 @@ export default function AttendanceManagementPage() {
 
       {viewMode === 'list' ? (
         <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-y-auto max-h-[600px] custom-scrollbar relative border-b border-slate-100">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white">
-                  <th className="p-8 w-20">
+              <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
+                <tr className="border-b border-slate-100">
+                  <th className="px-6 py-4 w-20">
                     <input 
                       type="checkbox" 
                       className="w-5 h-5 rounded border-slate-200 cursor-pointer"
@@ -573,20 +578,20 @@ export default function AttendanceManagementPage() {
                       onChange={handleSelectAll}
                     />
                   </th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">ID</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">날짜/시간</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">관원 성함</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">수련반</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">구분</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">상태</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest text-center">문자 발송</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest text-center">관리</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">ID</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">날짜/시간</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">회원 성함</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">수련반</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">구분</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">상태</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest text-center">문자 발송</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest text-center">관리</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="p-20 text-center">
+                    <td colSpan={9} className="py-24 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="w-12 h-12 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
                         <p className="text-slate-400 font-black tracking-widest text-xs uppercase">LOADING LOGS...</p>
@@ -597,8 +602,8 @@ export default function AttendanceManagementPage() {
                   if (filteredLogs.length === 0) {
                     return (
                       <tr>
-                        <td colSpan={7} className="p-20 text-center">
-                          <p className="text-xl font-black text-slate-300">해당하는 관원이 없습니다.</p>
+                        <td colSpan={9} className="py-24 text-center">
+                          <p className="text-xl font-black text-slate-300">해당하는 회원이 없습니다.</p>
                         </td>
                       </tr>
                     );
@@ -606,7 +611,7 @@ export default function AttendanceManagementPage() {
 
                   return filteredLogs.map((log: any) => (
                     <tr key={log.type === 'all' ? log.id : `${log.student_id}-${log.type}`} className={`group border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${typeof log.id === 'number' && selectedIds.includes(log.id) ? 'bg-blue-50/30' : ''}`}>
-                      <td className="p-8">
+                      <td className="px-6 py-3">
                         <input 
                           type="checkbox" 
                           className="w-5 h-5 rounded border-slate-200 cursor-pointer"
@@ -614,18 +619,18 @@ export default function AttendanceManagementPage() {
                           onChange={() => handleSelectOne(log.id)}
                         />
                       </td>
-                      <td className="p-8 text-slate-400 font-mono text-xs">{typeof log.id !== 'number' || log.id === 0 ? '-' : log.id}</td>
-                      <td className="p-8">
+                      <td className="px-6 py-3 text-slate-400 font-mono text-xs">{typeof log.id !== 'number' || log.id === 0 ? '-' : log.id}</td>
+                      <td className="px-6 py-3">
                         <p className="font-bold text-slate-700">{typeof log.id !== 'number' || log.id === 0 ? '기록 없음' : new Date(log.timestamp).toLocaleDateString('ko-KR')}</p>
                         <p className="text-xs font-medium text-slate-400">{typeof log.id !== 'number' || log.id === 0 ? '-' : new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour12: false })}</p>
                       </td>
-                      <td className="p-8 font-black text-slate-900 text-lg">{log.student_name}</td>
-                      <td className="p-8">
+                      <td className="px-6 py-3 font-black text-slate-900 text-lg">{log.student_name}</td>
+                      <td className="px-6 py-3">
                         <span className="bg-blue-50 text-blue-600 font-black text-xs px-3 py-1 rounded-lg border border-blue-100">
                           {log.class_name || '미배정'}
                         </span>
                       </td>
-                      <td className="p-8">
+                      <td className="px-6 py-3">
                         <span style={{ 
                           display: 'inline-block', 
                           minWidth: '60px', 
@@ -639,15 +644,15 @@ export default function AttendanceManagementPage() {
                           backgroundColor: log.type === 'IN' ? '#10B981' : log.type === 'OUT' ? '#3B82F6' : log.type === 'NOT_IN' ? '#EF4444' : '#F59E0B',
                           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                         }}>
-                          {log.type === 'IN' ? '등원' : log.type === 'OUT' ? '하원' : log.type === 'NOT_IN' ? '미등원' : '미하원'}
+                          {log.type === 'IN' ? '등원' : log.type === 'OUT' ? '하원' : log.type === 'NOT_IN' ? '미출근' : '미퇴근'}
                         </span>
                       </td>
-                      <td className="p-8">
+                      <td className="px-6 py-3">
                         <span className="text-slate-500 font-bold text-sm tracking-tight">
                           {log.status === 'NORMAL' ? '정상' : log.status}
                         </span>
                       </td>
-                      <td className="p-8 text-center">
+                      <td className="px-6 py-3 text-center">
                         {log.sms_status === 'SUCCESS' ? (
                           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-black border border-green-100">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
@@ -666,7 +671,7 @@ export default function AttendanceManagementPage() {
                           <span className="text-[10px] font-bold text-slate-300">미발송</span>
                         )}
                       </td>
-                      <td className="p-8 text-center">
+                      <td className="px-6 py-3 text-center">
                         {log.id !== 0 && (
                           <button
                             onClick={() => handleDelete(log.id)}
@@ -704,7 +709,7 @@ export default function AttendanceManagementPage() {
             <table className="w-full text-left border-collapse table-fixed min-w-[1100px]">
               <thead className="sticky top-0 bg-white/90 backdrop-blur-md z-20 shadow-sm">
                 <tr>
-                  <th className="pl-4 pr-1 py-3 w-24 font-black text-[11px] text-slate-400 uppercase tracking-widest bg-white sticky left-0 z-30 border-b">관원 이름</th>
+                  <th className="pl-4 pr-1 py-3 w-24 font-black text-[11px] text-slate-400 uppercase tracking-widest bg-white sticky left-0 z-30 border-b">회원 이름</th>
                   <th className="pl-4 pr-1 py-3 w-24 font-black text-[11px] text-slate-400 uppercase tracking-widest bg-white sticky left-[96px] z-30 border-b">수련반</th>
                   <th className="p-2 w-[60px] text-center font-black text-[11px] text-slate-400 uppercase tracking-widest bg-white sticky left-[192px] z-30 border-b">통계</th>
                   {daysArray.map(day => {
@@ -754,7 +759,7 @@ export default function AttendanceManagementPage() {
                   ).length === 0 ? (
                   <tr>
                     <td colSpan={daysInMonth + 3} className="p-20 text-center">
-                      <p className="text-xl font-black text-slate-300">등록된 관원이 없습니다.</p>
+                      <p className="text-xl font-black text-slate-300">등록된 회원이 없습니다.</p>
                     </td>
                   </tr>
                 ) : (
@@ -852,31 +857,6 @@ export default function AttendanceManagementPage() {
         }
       `}</style>
       
-      {/* 나가기 버튼 */}
-      <a 
-        href="http://localhost:3000/"
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '24px',
-          padding: '16px 32px',
-          backgroundColor: '#0F172A',
-          color: 'white',
-          borderRadius: '100px',
-          fontWeight: 900,
-          textDecoration: 'none',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          transition: 'all 0.3s'
-        }}
-        className="hover:bg-slate-800 hover:-translate-y-1"
-      >
-        <span>나가기</span>
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-      </a>
     </div>
   );
 }

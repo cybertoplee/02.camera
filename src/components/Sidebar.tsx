@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Zap, UserPlus, MonitorPlay, ClipboardList, Users, Coins, Settings, User, Lock, LogIn, LogOut, Video } from 'lucide-react';
+import { Home, Zap, UserPlus, MonitorPlay, ClipboardList, Users, Coins, Settings, User, Lock, LogIn, LogOut, Video } from 'lucide-react';
 
 export default function Sidebar() {
   const [username, setUsername] = useState("");

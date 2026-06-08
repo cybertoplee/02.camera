@@ -96,7 +96,7 @@
 <body class="text-gray-100 min-h-screen flex flex-col overflow-x-hidden">
 
     <header class="bg-gray-950/70 backdrop-blur-md border-b border-gray-800/80 px-6 py-4 flex justify-between items-center shadow-lg relative z-20">
-        <h1 class="text-lg md:text-xl font-black text-blue-400 tracking-wider flex items-center gap-3 digital-font">
+        <h1 onclick="window.parent.location.href = window.parent.location.pathname.replace(/\/cctv\/?$/, '') || '/'" class="text-lg md:text-xl font-black text-blue-400 tracking-wider flex items-center gap-3 digital-font cursor-pointer hover:text-blue-300 transition-colors">
             <span class="relative flex h-3 w-3">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>
@@ -250,8 +250,9 @@
                 <div>
                     <label class="block mb-3 text-gray-400 font-bold text-sm">로컬 녹화 저장 폴더 지정:</label>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="save-path" readonly placeholder="CCTV 녹화 파일을 저장할 폴더를 지정해주세요." class="w-full p-4 bg-gray-950 rounded-xl border border-gray-800 outline-none text-sm font-bold text-gray-300 placeholder:text-gray-600 focus:border-blue-500/50 transition-all">
-                        <button onclick="selectFolder()" class="bg-blue-600 px-6 py-4 rounded-xl hover:bg-blue-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_20px_rgba(37,99,235,0.25)]">폴더 지정하기</button>
+                        <input type="text" id="save-path" placeholder="CCTV 녹화 파일을 저장할 폴더를 지정해주세요." class="w-full p-4 bg-gray-950 rounded-xl border border-gray-800 outline-none text-sm font-bold text-gray-300 placeholder:text-gray-600 focus:border-blue-500/50 transition-all">
+                        <button onclick="saveManualPath()" class="bg-emerald-600 px-6 py-4 rounded-xl hover:bg-emerald-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.25)]">경로 저장하기</button>
+                        <button onclick="selectFolder()" class="bg-blue-600 px-6 py-4 rounded-xl hover:bg-blue-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_20px_rgba(37,99,235,0.25)]">폴더 선택</button>
                     </div>
                 </div>
                 <div id="storage-dashboard" class="hidden mt-6 border-t border-gray-800/80 pt-6">
@@ -325,7 +326,13 @@
                 }
             }, 5000);
 
-            const savedPath = localStorage.getItem('cctv_save_path');
+            let savedPath = localStorage.getItem('cctv_save_path');
+            if (!savedPath) {
+                // Set default path to 'c:/dev/camera' as requested
+                savedPath = 'c:/dev/camera';
+                localStorage.setItem('cctv_save_path', savedPath);
+            }
+
             if (savedPath) {
                 document.getElementById('save-path').value = savedPath;
                 isConfigured = true;
@@ -340,6 +347,21 @@
                 showPage('settings');
             }
         });
+
+        function saveManualPath() {
+            const pathInput = document.getElementById('save-path').value.trim();
+            if (!pathInput) {
+                alert("저장할 폴더 경로를 입력해주세요.");
+                return;
+            }
+            isConfigured = true;
+            localStorage.setItem('cctv_save_path', pathInput);
+            document.getElementById('storage-dashboard').classList.remove('hidden');
+            updateStorageMetrics();
+            alert("폴더가 설정되었습니다.");
+            showPage('cctv');
+            startCamera();
+        }
 
         async function selectFolder() {
             try {
@@ -578,20 +600,41 @@
 
         function makeFullScreen() {
             const container = document.getElementById('video-container');
+            // Expand container and request fullscreen
             container.classList.remove('max-w-3xl');
             container.classList.add('max-w-full', 'h-[calc(100vh-280px)]');
+            // Hide right-side panel
+            const panel = document.querySelector('.cyber-panel');
+            if (panel) panel.classList.add('hidden');
+            // Show floating revert button only
             document.getElementById('floating-revert-btn').classList.remove('hidden');
+            // Hide panel controls
             document.getElementById('btn-fullscreen').classList.add('hidden');
-            document.getElementById('btn-revert').classList.remove('hidden');
+            document.getElementById('btn-revert').classList.add('hidden');
         }
 
         function revertSize() {
             const container = document.getElementById('video-container');
+            // Exit browser fullscreen if active
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else if (document.webkitFullscreenElement) {
+                document.webkitExitFullscreen();
+            } else if (document.msFullscreenElement) {
+                document.msExitFullscreen();
+            }
+            // Restore container size classes
             container.classList.remove('max-w-full', 'h-[calc(100vh-280px)]');
             container.classList.add('max-w-3xl');
+            // Hide floating revert button
             document.getElementById('floating-revert-btn').classList.add('hidden');
+            // Show fullscreen button
             document.getElementById('btn-fullscreen').classList.remove('hidden');
+            // Hide revert button in panel
             document.getElementById('btn-revert').classList.add('hidden');
+            // Show the right-side control panel
+            const panel = document.querySelector('.cyber-panel');
+            if (panel) panel.classList.remove('hidden');
         }
 
         function playVideo(url, filename) {

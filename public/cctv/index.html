@@ -96,7 +96,7 @@
 <body class="text-gray-100 min-h-screen flex flex-col overflow-x-hidden">
 
     <header class="bg-gray-950/70 backdrop-blur-md border-b border-gray-800/80 px-6 py-4 flex justify-between items-center shadow-lg relative z-20">
-        <h1 class="text-lg md:text-xl font-black text-blue-400 tracking-wider flex items-center gap-3 digital-font">
+        <h1 onclick="window.parent.location.href = window.parent.location.pathname.replace(/\/cctv\/?$/, '') || '/'" class="text-lg md:text-xl font-black text-blue-400 tracking-wider flex items-center gap-3 digital-font cursor-pointer hover:text-blue-300 transition-colors">
             <span class="relative flex h-3 w-3">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>
@@ -250,8 +250,9 @@
                 <div>
                     <label class="block mb-3 text-gray-400 font-bold text-sm">로컬 녹화 저장 폴더 지정:</label>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="save-path" readonly placeholder="CCTV 녹화 파일을 저장할 폴더를 지정해주세요." class="w-full p-4 bg-gray-950 rounded-xl border border-gray-800 outline-none text-sm font-bold text-gray-300 placeholder:text-gray-600 focus:border-blue-500/50 transition-all">
-                        <button onclick="selectFolder()" class="bg-blue-600 px-6 py-4 rounded-xl hover:bg-blue-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_20px_rgba(37,99,235,0.25)]">폴더 지정하기</button>
+                        <input type="text" id="save-path" placeholder="CCTV 녹화 파일을 저장할 폴더를 지정해주세요." class="w-full p-4 bg-gray-950 rounded-xl border border-gray-800 outline-none text-sm font-bold text-gray-300 placeholder:text-gray-600 focus:border-blue-500/50 transition-all">
+                        <button onclick="saveManualPath()" class="bg-emerald-600 px-6 py-4 rounded-xl hover:bg-emerald-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.25)]">경로 저장하기</button>
+                        <button onclick="selectFolder()" class="bg-blue-600 px-6 py-4 rounded-xl hover:bg-blue-500 font-black text-sm whitespace-nowrap transition-all active:scale-95 shadow-[0_8px_20px_rgba(37,99,235,0.25)]">폴더 선택</button>
                     </div>
                 </div>
                 <div id="storage-dashboard" class="hidden mt-6 border-t border-gray-800/80 pt-6">
@@ -278,17 +279,30 @@
     </main>
 
     <!-- Playback Video Modal -->
-    <div id="play-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-gray-950 border border-gray-800/80 w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl relative">
-            <div class="p-5 border-b border-gray-850 flex justify-between items-center bg-gray-900/40">
+    <div id="play-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] hidden items-center justify-center p-4">
+        <div class="bg-gray-950 border border-gray-800/80 w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col" style="max-height: 90vh;">
+            <div class="p-5 border-b border-gray-850 flex justify-between items-center bg-gray-900/40 shrink-0">
                 <h3 id="modal-title" class="font-black text-sm md:text-base text-blue-400 tracking-tight digital-font uppercase">CCTV PLAYBACK PORT</h3>
                 <button onclick="closePlayModal()" class="w-8 h-8 rounded-full bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center font-bold transition-colors">✕</button>
             </div>
-            <div class="aspect-video bg-black relative">
-                <video id="modal-video" class="w-full h-full object-cover" controls autoplay>
+            <div class="w-full bg-black relative flex-1 min-h-[300px]">
+                <video id="modal-video" class="w-full h-full" controls autoplay style="max-height: calc(90vh - 70px);">
                     <source src="https://assets.mixkit.co/videos/preview/mixkit-security-camera-footage-of-a-corridor-in-a-building-42171-large.mp4" type="video/mp4">
                     브라우저가 비디오 재생을 지원하지 않습니다.
                 </video>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="image-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] hidden items-center justify-center p-4">
+        <div class="bg-gray-950 border border-gray-800/80 w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col">
+            <div class="p-5 border-b border-gray-850 flex justify-between items-center bg-gray-900/40 shrink-0">
+                <h3 id="image-modal-title" class="font-black text-sm md:text-base text-red-400 tracking-tight digital-font uppercase">SNAPSHOT VIEWER</h3>
+                <button onclick="closeImageModal()" class="w-8 h-8 rounded-full bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center font-bold transition-colors">✕</button>
+            </div>
+            <div class="w-full bg-black relative flex-1 flex justify-center items-center p-4">
+                <img id="modal-image" src="" alt="Snapshot" class="max-w-full max-h-[80vh] object-contain rounded-lg">
             </div>
         </div>
     </div>
@@ -325,7 +339,13 @@
                 }
             }, 5000);
 
-            const savedPath = localStorage.getItem('cctv_save_path');
+            let savedPath = localStorage.getItem('cctv_save_path');
+            if (!savedPath) {
+                // Set default path to 'c:/dev/camera' as requested
+                savedPath = 'c:/dev/camera';
+                localStorage.setItem('cctv_save_path', savedPath);
+            }
+
             if (savedPath) {
                 document.getElementById('save-path').value = savedPath;
                 isConfigured = true;
@@ -340,6 +360,21 @@
                 showPage('settings');
             }
         });
+
+        function saveManualPath() {
+            const pathInput = document.getElementById('save-path').value.trim();
+            if (!pathInput) {
+                alert("저장할 폴더 경로를 입력해주세요.");
+                return;
+            }
+            isConfigured = true;
+            localStorage.setItem('cctv_save_path', pathInput);
+            document.getElementById('storage-dashboard').classList.remove('hidden');
+            updateStorageMetrics();
+            alert("폴더가 설정되었습니다.");
+            showPage('cctv');
+            startCamera();
+        }
 
         async function selectFolder() {
             try {
@@ -478,6 +513,8 @@
                         video_url: '#'
                     })
                 });
+                // Refresh events list after saving
+                loadEvents();
             } catch (err) { console.error('Failed to save event to DB', err); }
         }
 
@@ -526,6 +563,8 @@
                         records: recordsToSync
                     })
                 });
+                // Refresh records list after syncing
+                loadRecords();
             } catch(err) {
                 console.error('Failed syncing blocks to DB', err);
             }
@@ -578,36 +617,86 @@
 
         function makeFullScreen() {
             const container = document.getElementById('video-container');
-            container.classList.remove('max-w-3xl');
-            container.classList.add('max-w-full', 'h-[calc(100vh-280px)]');
+            // Request browser fullscreen on the container
+            if (container.requestFullscreen) {
+                container.requestFullscreen();
+            } else if (container.webkitRequestFullscreen) { // Safari
+                container.webkitRequestFullscreen();
+            } else if (container.msRequestFullscreen) { // IE11
+                container.msRequestFullscreen();
+            }
+            // Hide the right-side control panel
+            const panel = document.querySelector('.cyber-panel');
+            if (panel) panel.classList.add('hidden');
+            // Show floating revert button only
             document.getElementById('floating-revert-btn').classList.remove('hidden');
+            // Hide other full-screen/revert controls in the panel
             document.getElementById('btn-fullscreen').classList.add('hidden');
-            document.getElementById('btn-revert').classList.remove('hidden');
-        }
-
-        function revertSize() {
-            const container = document.getElementById('video-container');
-            container.classList.remove('max-w-full', 'h-[calc(100vh-280px)]');
-            container.classList.add('max-w-3xl');
-            document.getElementById('floating-revert-btn').classList.add('hidden');
-            document.getElementById('btn-fullscreen').classList.remove('hidden');
             document.getElementById('btn-revert').classList.add('hidden');
         }
 
+        function revertSize() {
+    const container = document.getElementById('video-container');
+    // Exit browser fullscreen if active
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    } else if (document.webkitFullscreenElement) {
+        document.webkitExitFullscreen();
+    } else if (document.msFullscreenElement) {
+        document.msExitFullscreen();
+    }
+    // Restore container size classes
+    container.classList.remove('max-w-full', 'h-[calc(100vh-280px)]');
+    container.classList.add('max-w-3xl');
+    // Hide floating revert button
+    document.getElementById('floating-revert-btn').classList.add('hidden');
+    // Show fullscreen button
+    document.getElementById('btn-fullscreen').classList.remove('hidden');
+    // Hide revert button in panel
+    document.getElementById('btn-revert').classList.add('hidden');
+    // Show the right-side control panel
+    const panel = document.querySelector('.cyber-panel');
+    if (panel) panel.classList.remove('hidden');
+}
+
         function playVideo(url, filename) {
-            const modal = document.getElementById('play-modal');
-            const video = document.getElementById('modal-video');
-            document.getElementById('modal-title').innerText = `CCTV PLAYBACK | ${filename}`;
-            video.src = url;
-            video.load();
-            modal.classList.remove('hidden');
+            const popup = window.open("", "CCTV_Playback", "width=800,height=600,menubar=no,toolbar=no,location=no,status=no");
+            popup.document.write(`
+                <html>
+                <head>
+                    <title>CCTV PLAYBACK | ${filename}</title>
+                    <style>body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }</style>
+                </head>
+                <body>
+                    <video src="${url}" controls autoplay style="max-width: 100%; max-height: 100%;"></video>
+                </body>
+                </html>
+            `);
+            popup.document.close();
         }
 
         function closePlayModal() {
-            const modal = document.getElementById('play-modal');
-            const video = document.getElementById('modal-video');
-            video.pause();
-            modal.classList.add('hidden');
+            // No longer used, but kept for compatibility if needed
+        }
+
+        function showImageModal(src, title) {
+            const popup = window.open("", "CCTV_Snapshot", "width=800,height=600,menubar=no,toolbar=no,location=no,status=no");
+            popup.document.write(`
+                <html>
+                <head>
+                    <title>EVENT SNAPSHOT | ${title}</title>
+                    <style>body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }</style>
+                </head>
+                <body>
+                    <img src="${src}" style="max-width: 100%; max-height: 100%; object-fit: contain;"/>
+                </body>
+                </html>
+            `);
+            popup.document.close();
+        }
+
+        function closeImageModal() {
+            // No longer used
         }
 
         async function loadRecords() {
@@ -660,7 +749,7 @@
                                 ${r.type}
                             </td>
                             <td class="p-4">
-                                ${r.snapshot ? `<img src="${r.snapshot}" class="w-20 h-11 object-cover rounded border border-gray-800 cursor-pointer hover:scale-150 transition-all hover:border-red-500/50 shadow-md"/>` : 'N/A'}
+                                ${r.snapshot ? `<img src="${r.snapshot}" onclick="showImageModal(this.src, '${r.timestamp}')" class="w-20 h-11 object-cover rounded border border-gray-800 cursor-pointer hover:scale-110 transition-all hover:border-red-500/50 shadow-md"/>` : 'N/A'}
                             </td>
                             <td class="p-4 text-sm text-right">
                                 <span class="bg-red-950/40 border border-red-800/50 text-red-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">Warning</span>

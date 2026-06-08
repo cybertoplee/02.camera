@@ -11,7 +11,14 @@ import {
   Trash2,
   Calendar,
   CreditCard,
-  ArrowRight
+  ArrowRight,
+  Edit2,
+  Save,
+  X,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  LogOut
 } from 'lucide-react';
 import { 
   getBankTransactionsAction, 
@@ -48,6 +55,13 @@ export default function PaymentManagementPage() {
   const [activeView, setActiveView] = useState<'RECORDS' | 'BANK'>('RECORDS');
   const [bankTransactions, setBankTransactions] = useState<any[]>([]);
   const [classMap, setClassMap] = useState<Record<number, string>>({});
+
+  const [editingRecordId, setEditingRecordId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({
+    depositor_name: '',
+    amount: 0,
+    payment_date: ''
+  });
 
   useEffect(() => {
     fetchData();
@@ -134,6 +148,36 @@ export default function PaymentManagementPage() {
     }
   };
 
+  const startEditing = (record: PaymentRecord) => {
+    setEditingRecordId(record.id);
+    setEditForm({
+      depositor_name: record.depositor_name || '',
+      amount: record.amount || 0,
+      payment_date: record.payment_date ? new Date(record.payment_date).toISOString().split('T')[0] : ''
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editingRecordId) return;
+    try {
+      const res = await updateRowsAction('payment_records', {
+        depositor_name: editForm.depositor_name,
+        amount: Number(editForm.amount),
+        payment_date: editForm.payment_date
+      }, { ids: [editingRecordId] });
+      
+      if (res.success) {
+        setEditingRecordId(null);
+        fetchData();
+        alert('성공적으로 수정되었습니다.');
+      } else {
+        alert('수정 실패: ' + res.error);
+      }
+    } catch (err) {
+      console.error('수정 실패:', err);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm('이 수납 내역을 삭제하시겠습니까?')) return;
     try {
@@ -167,6 +211,23 @@ export default function PaymentManagementPage() {
     }
   };
 
+  const [sortColumn, setSortColumn] = useState<'payment_date' | 'depositor_name' | 'student_name' | 'amount' | 'status'>('payment_date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (col: 'payment_date' | 'depositor_name' | 'student_name' | 'amount' | 'status') => {
+    if (sortColumn === col) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(col);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (col: string) => {
+    if (sortColumn !== col) return <ArrowUpDown size={14} className="opacity-30 inline-block ml-2" />;
+    return sortDirection === 'asc' ? <ChevronUp size={14} className="text-blue-500 inline-block ml-2" /> : <ChevronDown size={14} className="text-blue-500 inline-block ml-2" />;
+  };
+
   const filteredRecords = records.filter(r => {
     const matchesFilter = filter === 'ALL' || r.status === filter;
     const matchesSearch = 
@@ -176,6 +237,41 @@ export default function PaymentManagementPage() {
       (r.parent_phone && r.parent_phone.includes(searchTerm)) ||
       matchChosung(r.class_name || '', searchTerm);
     return matchesFilter && matchesSearch;
+  }).sort((a, b) => {
+    let valA: any = a[sortColumn as keyof PaymentRecord] || '';
+    let valB: any = b[sortColumn as keyof PaymentRecord] || '';
+    
+    if (sortColumn === 'amount') {
+      valA = Number(valA);
+      valB = Number(valB);
+    } else if (sortColumn === 'payment_date') {
+      valA = new Date(valA as string).getTime();
+      valB = new Date(valB as string).getTime();
+    }
+    
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const monthlyTotals: Record<string, number> = {};
+  let yearlyTotal = 0;
+  const currentYear = new Date().getFullYear();
+
+  records.forEach(r => {
+    if (r.status === 'MATCHED') {
+      const date = new Date(r.payment_date);
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const monthKey = `${yyyy}년 ${mm}월`;
+      
+      if (!monthlyTotals[monthKey]) monthlyTotals[monthKey] = 0;
+      monthlyTotals[monthKey] += Number(r.amount);
+      
+      if (yyyy === currentYear) {
+        yearlyTotal += Number(r.amount);
+      }
+    }
   });
 
   return (
@@ -285,17 +381,19 @@ export default function PaymentManagementPage() {
       {/* TABLE AREA */}
       <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white overflow-hidden shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)]">
         {activeView === 'RECORDS' ? (
-          <table className="w-full text-left">
-            <thead className="border-b border-slate-100">
-              <tr>
-                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">일자</th>
-                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">입금자명</th>
-                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">매칭된 관원</th>
-                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">금액</th>
-                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">상태</th>
-                <th className="p-8 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">관리</th>
-              </tr>
-            </thead>
+          <div className="flex flex-col">
+            <div className="overflow-y-auto max-h-[500px] custom-scrollbar relative border-b border-slate-100">
+              <table className="w-full text-left">
+              <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
+                <tr>
+                  <th className="p-4 px-6 text-[22px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleSort('payment_date')}>일자 {getSortIcon('payment_date')}</th>
+                  <th className="p-4 px-6 text-[22px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleSort('depositor_name')}>입금자명 {getSortIcon('depositor_name')}</th>
+                  <th className="p-4 px-6 text-[22px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleSort('student_name')}>매칭된 관원 {getSortIcon('student_name')}</th>
+                  <th className="p-4 px-6 text-[22px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleSort('amount')}>금액 {getSortIcon('amount')}</th>
+                  <th className="p-4 px-6 text-[22px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleSort('status')}>상태 {getSortIcon('status')}</th>
+                  <th className="p-4 px-6 text-[22px] font-black text-slate-400 uppercase tracking-widest text-center">관리</th>
+                </tr>
+              </thead>
             <tbody>
               {loading ? (
                 <tr>
@@ -315,31 +413,58 @@ export default function PaymentManagementPage() {
               ) : (
                 filteredRecords.map((record) => (
                   <tr key={record.id} className="border-b border-[#F1F5F9] hover:bg-slate-50 transition-colors">
-                    <td className="p-6">
+                    <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
                           <Calendar size={14} />
                         </div>
-                        <span className="text-sm font-bold text-slate-600">{new Date(record.payment_date).toLocaleDateString()}</span>
+                        {editingRecordId === record.id ? (
+                          <input 
+                            type="date" 
+                            value={editForm.payment_date} 
+                            onChange={e => setEditForm({...editForm, payment_date: e.target.value})} 
+                            className="bg-white border-2 border-slate-200 rounded-lg px-2 py-1 font-bold text-slate-700 outline-none focus:border-blue-500" 
+                          />
+                        ) : (
+                          <span className="text-[16px] font-bold text-slate-600">{new Date(record.payment_date).toLocaleDateString()}</span>
+                        )}
                       </div>
                     </td>
-                    <td className="p-6">
-                      <span className="text-lg font-black text-slate-900">{record.depositor_name}</span>
+                    <td className="px-6 py-3">
+                      {editingRecordId === record.id ? (
+                        <input 
+                          type="text" 
+                          value={editForm.depositor_name} 
+                          onChange={e => setEditForm({...editForm, depositor_name: e.target.value})} 
+                          className="w-full bg-white border-2 border-slate-200 rounded-lg px-2 py-1 font-bold text-[16px] text-slate-700 outline-none focus:border-blue-500" 
+                        />
+                      ) : (
+                        <span className="text-[16px] font-black text-slate-900">{record.depositor_name}</span>
+                      )}
                     </td>
-                    <td className="p-6">
+                    <td className="px-6 py-3">
                       {record.student_name ? (
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-[10px] text-blue-600 font-black">ST</div>
-                          <span className="font-black text-slate-700">{record.student_name}</span>
+                          <span className="font-black text-[16px] text-slate-700">{record.student_name}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-300 text-sm font-bold">매칭 정보 없음</span>
+                        <span className="text-slate-300 text-[16px] font-bold">매칭 정보 없음</span>
                       )}
                     </td>
-                    <td className="p-6">
-                      <span className="text-lg font-black text-slate-900">{record.amount.toLocaleString()}원</span>
+                    <td className="px-6 py-3">
+                      {editingRecordId === record.id ? (
+                        <input 
+                          type="number" 
+                          value={editForm.amount} 
+                          onChange={e => setEditForm({...editForm, amount: Number(e.target.value)})} 
+                          className="w-24 bg-white border-2 border-slate-200 rounded-lg px-2 py-1 font-bold text-[16px] text-slate-700 outline-none focus:border-blue-500" 
+                        />
+                      ) : (
+                        <span className="text-[16px] font-black text-slate-900">{record.amount.toLocaleString()}원</span>
+                      )}
                     </td>
-                    <td className="p-6">
+                    <td className="px-6 py-3">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                         record.status === 'MATCHED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
                       }`}>
@@ -350,22 +475,32 @@ export default function PaymentManagementPage() {
                         )}
                       </span>
                     </td>
-                    <td className="p-6 text-center">
+                    <td className="px-6 py-3 text-center">
                       <div className="flex justify-center gap-2">
-                        {record.status === 'UNMATCHED' && (
-                          <button 
-                            onClick={() => setShowMatchModal(record.id)}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[11px] hover:bg-blue-700 transition-all shadow-md active:scale-95"
-                          >
-                            관원 매칭
-                          </button>
+                        {editingRecordId === record.id ? (
+                          <>
+                            <button onClick={handleEditSave} className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all"><Save size={18} /></button>
+                            <button onClick={() => setEditingRecordId(null)} className="p-2 text-slate-500 bg-slate-50 hover:bg-slate-200 rounded-xl transition-all"><X size={18} /></button>
+                          </>
+                        ) : (
+                          <>
+                            {record.status === 'UNMATCHED' && (
+                              <button 
+                                onClick={() => setShowMatchModal(record.id)}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[11px] hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                              >
+                                관원 매칭
+                              </button>
+                            )}
+                            <button onClick={() => startEditing(record)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-all"><Edit2 size={18} /></button>
+                            <button 
+                              onClick={() => handleDelete(record.id)}
+                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </>
                         )}
-                        <button 
-                          onClick={() => handleDelete(record.id)}
-                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -373,6 +508,25 @@ export default function PaymentManagementPage() {
               )}
             </tbody>
           </table>
+          </div>
+          <div className="bg-slate-50 p-8 border-t border-slate-100 flex justify-between items-center overflow-x-auto gap-8">
+            <div className="flex gap-4">
+              {Object.entries(monthlyTotals).sort(([a], [b]) => a.localeCompare(b)).map(([month, total]) => (
+                <div key={month} className="bg-white px-6 py-4 rounded-2xl shadow-sm border border-slate-200 whitespace-nowrap">
+                  <p className="text-sm font-bold text-slate-500 mb-1">{month} 누적 수납액</p>
+                  <p className="text-xl font-black text-blue-600">{total.toLocaleString()}원</p>
+                </div>
+              ))}
+              {Object.keys(monthlyTotals).length === 0 && (
+                <div className="text-slate-400 font-bold italic py-4">월별 수납 데이터가 없습니다.</div>
+              )}
+            </div>
+            <div className="bg-blue-600 px-8 py-5 rounded-2xl shadow-md border border-blue-500 whitespace-nowrap shrink-0 ml-auto">
+              <p className="text-sm font-bold text-blue-200 mb-1">{currentYear}년도 총 수납 누계</p>
+              <p className="text-2xl font-black text-white">{yearlyTotal.toLocaleString()}원</p>
+            </div>
+          </div>
+        </div>
         ) : (
           <table className="w-full text-left">
             <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">

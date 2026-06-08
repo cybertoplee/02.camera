@@ -146,7 +146,7 @@ export default function StudentManagementPage() {
         return;
       }
       
-      if (videoRef.current.readyState < 2) {
+      if (!videoRef.current || videoRef.current.readyState < 2 || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
         if (isActive) timeoutId = setTimeout(trackFace, 150);
         return;
       }
@@ -205,7 +205,7 @@ export default function StudentManagementPage() {
     if (!videoRef.current || !isModelLoaded) return;
     
     // 비디오가 실제로 재생 중인지 확인
-    if (videoRef.current.readyState < 2) {
+    if (videoRef.current.readyState < 2 || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
       setFaceStatus('카메라가 준비될 때까지 잠시만 기다려 주세요.');
       return;
     }
@@ -270,10 +270,17 @@ export default function StudentManagementPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    try {
-      const fieldsRes = await queryTable('custom_fields');
-      setCustomFields(fieldsRes.rows || []);
+      // Load custom fields; if table does not exist, treat as empty.
+      let customFieldsRows: any[] = [];
+      try {
+        const fieldsRes = await queryTable('custom_fields');
+        customFieldsRows = fieldsRes.rows || [];
+      } catch (e) {
+        console.warn('custom_fields table missing or load error:', e);
+      }
+      setCustomFields(customFieldsRows);
 
+      // Load class mapping
       const classesRes = await queryTable('student_classes');
       const cmap: Record<number, string> = {};
       classesRes.rows?.forEach((cls: any) => {
@@ -283,11 +290,7 @@ export default function StudentManagementPage() {
 
       const res = await queryTable('students');
       setStudents(res.rows || []);
-    } catch (err) {
-      console.error('데이터 로드 실패:', err);
-    } finally {
       setLoading(false);
-    }
   };
 
   const handleAddField = async () => {
@@ -503,9 +506,9 @@ export default function StudentManagementPage() {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div style={{ display: 'flex', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '16px' }}>
             {[
-              { id: 'ACTIVE', label: '재원생' },
-              { id: 'ON_HOLD', label: '휴관생' },
-              { id: 'DISCHARGED', label: '퇴관생' }
+              { id: 'ACTIVE', label: '재직중' },
+              { id: 'ON_HOLD', label: '휴직중' },
+              { id: 'DISCHARGED', label: '퇴직중' }
             ].map(tab => (
               <button 
                 key={tab.id}
@@ -601,22 +604,22 @@ export default function StudentManagementPage() {
         <div className="py-40 text-center bg-white/40 backdrop-blur-xl rounded-[48px] border-2 border-dashed border-white shadow-[0_8px_32px_rgba(0,0,0,0.02)]">
           <div className="flex justify-center mb-4"><Inbox size={48} strokeWidth={1} className="text-slate-400" /></div>
           <p className="text-xl font-black text-slate-400">
-            {statusFilter === 'ACTIVE' ? '재원생 중' : statusFilter === 'ON_HOLD' ? '휴관생 중' : '퇴관생 중'} 검색 결과가 없습니다.
+            {statusFilter === 'ACTIVE' ? '재직중' : statusFilter === 'ON_HOLD' ? '휴직중' : '퇴직중'} 검색 결과가 없습니다.
           </p>
         </div>
       ) : (
         <div className="bg-white/80 backdrop-blur-2xl rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-y-auto max-h-[600px] custom-scrollbar relative border-b border-slate-100">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white">
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">상태 / 이름 / 알림</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">수련반</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">생년월일</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">보호자 정보</th>
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">메모</th>
-                  {customFields.map(field => <th key={field.id} className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest">{field.display_name}</th>)}
-                  <th className="p-8 font-black text-[11px] text-slate-400 uppercase tracking-widest text-center">관리</th>
+              <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
+                <tr className="border-b border-slate-100">
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">상태 / 이름 / 알림</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">수련반</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">생년월일</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">보호자 정보</th>
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">메모</th>
+                  {customFields.map(field => <th key={field.id} className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest">{field.display_name}</th>)}
+                  <th className="px-6 py-4 font-black text-[13px] text-slate-400 uppercase tracking-widest text-center">관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -636,7 +639,7 @@ export default function StudentManagementPage() {
                   })
                   .map((student) => (
                   <tr key={student.id} className={`group border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${student.status !== 'ACTIVE' && student.status ? 'opacity-70 grayscale-[0.5]' : ''}`}>
-                    <td className="p-8">
+                    <td className="px-6 py-3">
                       <div className="flex items-center gap-4">
                         <div className="flex flex-col gap-1 items-center">
                           <div 
@@ -655,11 +658,11 @@ export default function StudentManagementPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-black text-slate-900 text-lg leading-none">{student.name}</p>
                             {student.status === 'ON_HOLD' ? (
-                              <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded-md">휴관</span>
+                              <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded-md">휴직</span>
                             ) : student.status === 'DISCHARGED' ? (
-                              <span className="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-md">퇴관</span>
+                              <span className="text-[10px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-md">퇴직</span>
                             ) : (
-                              <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md">재원</span>
+                              <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md">재직</span>
                             )}
                           </div>
                           <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter">{student.rank || '일반'}</p>
@@ -678,19 +681,19 @@ export default function StudentManagementPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-8 font-black text-blue-600">
+                    <td className="px-6 py-3 font-black text-blue-600">
                       <span className="bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">{classMap[student.class_id] || '미배정'}</span>
                     </td>
-                    <td className="p-8 font-bold text-slate-600">{student.birth_date || '-'}</td>
-                    <td className="p-8">
+                    <td className="px-6 py-3 font-bold text-slate-600">{student.birth_date || '-'}</td>
+                    <td className="px-6 py-3">
                       <p className="font-bold text-slate-700">{student.parent_name || '-'}</p>
                       <p className="text-xs font-medium text-slate-400">{student.parent_phone || '-'}</p>
                     </td>
-                    <td className="p-8">
+                    <td className="px-6 py-3">
                       <p className="text-sm text-slate-500 font-medium max-w-[200px] truncate">{student.memo || '-'}</p>
                     </td>
-                    {customFields.map(field => <td key={field.id} className="p-8 text-slate-600 font-medium">{student[field.field_name] || '-'}</td>)}
-                    <td className="p-8">
+                    {customFields.map(field => <td key={field.id} className="px-6 py-3 text-slate-600 font-medium">{student[field.field_name] || '-'}</td>)}
+                    <td className="px-6 py-3">
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
                         <button 
                           onClick={() => startEdit(student)} 

@@ -1,10 +1,11 @@
-import { createTable, queryTable, insertRows } from '../../egdesk-helpers';
+import { createTable, queryTable, insertRows, deleteTable } from '../../egdesk-helpers';
 
 export async function setupDatabase() {
   console.log('Starting database setup...');
 
   // 1. Classes Table
   try {
+    try { await deleteTable('classes'); } catch (e) {}
     await createTable('수업 정보', [
       { name: 'id', type: 'INTEGER', notNull: true },
       { name: 'name', type: 'TEXT', notNull: true },
@@ -18,6 +19,7 @@ export async function setupDatabase() {
 
   // 2. Students Table
   try {
+    try { await deleteTable('students'); } catch (e) {}
     await createTable('학생 명단', [
       { name: 'id', type: 'INTEGER', notNull: true },
       { name: 'name', type: 'TEXT', notNull: true },
@@ -26,8 +28,12 @@ export async function setupDatabase() {
       { name: 'birth_date', type: 'TEXT' },
       { name: 'rank', type: 'TEXT' },
       { name: 'memo', type: 'TEXT' },
-      { name: 'face_vector', type: 'TEXT' }, // JSON string of embeddings
+      { name: 'face_vector', type: 'TEXT' },
+      { name: 'profile_image', type: 'TEXT' },
       { name: 'class_id', type: 'INTEGER' },
+      { name: 'status', type: 'TEXT', defaultValue: 'ACTIVE' },
+      { name: 'receive_sms_in', type: 'TEXT', defaultValue: 'true' },
+      { name: 'receive_sms_out', type: 'TEXT', defaultValue: 'true' },
     ], { tableName: 'students', uniqueKeyColumns: ['id'] });
     console.log('Table "students" created.');
   } catch (e: any) {
@@ -36,6 +42,7 @@ export async function setupDatabase() {
 
   // 3. Attendance Logs Table
   try {
+    try { await deleteTable('attendance_logs'); } catch (e) {}
     await createTable('출결 기록', [
       { name: 'id', type: 'INTEGER', notNull: true },
       { name: 'student_id', type: 'INTEGER', notNull: true },
@@ -51,6 +58,7 @@ export async function setupDatabase() {
 
   // 4. Payment Records Table
   try {
+    try { await deleteTable('payment_records'); } catch (e) {}
     await createTable('수납 기록', [
       { name: 'id', type: 'INTEGER', notNull: true },
       { name: 'student_id', type: 'INTEGER' },
@@ -66,6 +74,7 @@ export async function setupDatabase() {
 
   // 5. Student Classes Table
   try {
+    try { await deleteTable('student_classes'); } catch (e) {}
     await createTable('반 관리', [
       { name: 'id', type: 'INTEGER', notNull: true },
       { name: 'name', type: 'TEXT', notNull: true },
@@ -88,6 +97,7 @@ export async function setupDatabase() {
 
   // 6. Custom Fields Table
   try {
+    try { await deleteTable('custom_fields'); } catch (e) {}
     await createTable('사용자 정의 필드', [
       { name: 'id', type: 'INTEGER', notNull: true },
       { name: 'field_name', type: 'TEXT', notNull: true },
@@ -100,6 +110,7 @@ export async function setupDatabase() {
 
   // 7. System Settings Table
   try {
+    try { await deleteTable('tkd_system_settings'); } catch (e) {}
     await createTable('태권도 시스템 설정', [
       { name: 'key', type: 'TEXT', notNull: true },
       { name: 'value', type: 'TEXT' }
@@ -145,6 +156,20 @@ export async function setupDatabase() {
       { name: 'video_url', type: 'TEXT' },
     ], { tableName: 'cctv_events', uniqueKeyColumns: ['id'] });
     console.log('Table "cctv_events" created.');
+  } catch (e: any) {
+    console.error('Error during setup step:', e.message);
+  }
+
+  // 10. tkd_usage_logs Table
+  try {
+    try { await deleteTable('tkd_usage_logs'); } catch (e) {}
+    await createTable('사용량 통계 로그', [
+      { name: 'id', type: 'INTEGER', notNull: true },
+      { name: 'type', type: 'TEXT', notNull: true },
+      { name: 'timestamp', type: 'TEXT', notNull: true },
+      { name: 'student_id', type: 'INTEGER' }
+    ], { tableName: 'tkd_usage_logs', uniqueKeyColumns: ['id'] });
+    console.log('Table "tkd_usage_logs" created.');
   } catch (e: any) {
     console.error('Error during setup step:', e.message);
   }

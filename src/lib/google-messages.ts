@@ -116,12 +116,19 @@ export class GoogleMessagesAutomation {
     // 웰컴 페이지나 로그인 유도 페이지인 경우만 처리
     try {
       if (this.page!.url().includes('welcome')) {
-        const pairButton = await this.page!.$('button:has-text("기기 페어링"), a:has-text("기기 페어링"), [aria-label*="기기 페어링"]');
-        if (pairButton) {
-          await pairButton.click();
+        // Google 계정 페어링(이메일 연동)을 최우선으로 시도합니다.
+        const googlePairButton = await this.page!.$('button:has-text("Google 계정"), a:has-text("Google 계정"), [aria-label*="Google 계정"], button:has-text("Google account"), a:has-text("Google account")');
+        if (googlePairButton) {
+          console.log('[GoogleMessages] Google 계정 페어링 버튼 클릭 중...');
+          await googlePairButton.click();
         } else {
-          const loginButton = await this.page!.$('a:has-text("로그인"), button:has-text("로그인")');
-          if (loginButton) await loginButton.click();
+          const pairButton = await this.page!.$('button:has-text("기기 페어링"), a:has-text("기기 페어링"), [aria-label*="기기 페어링"]');
+          if (pairButton) {
+            await pairButton.click();
+          } else {
+            const loginButton = await this.page!.$('a:has-text("로그인"), button:has-text("로그인")');
+            if (loginButton) await loginButton.click();
+          }
         }
         await this.page!.waitForLoadState('domcontentloaded');
       }
@@ -166,7 +173,7 @@ export class GoogleMessagesAutomation {
       // 로그인이 완료될 때까지 대기 (채팅 시작 버튼 또는 대화 목록이 보이면 성공)
       // 이미 페어링된 경우 즉시 성공 처리됨
       try {
-        await this.page.waitForSelector('input[placeholder*="시작"], button:has-text("시작"), [aria-label*="시작"], .conversation-list, [role="grid"]', { timeout: 120000 });
+        await this.page.waitForSelector('input[placeholder*="시작"], input[placeholder*="Start"], button:has-text("시작"), button:has-text("Start chat"), [aria-label*="시작"], [aria-label*="Start chat"], .conversation-list, [role="grid"]', { timeout: 120000 });
       } catch (waitErr) {
         throw new Error('연동 확인 시간이 초과되었습니다. 브라우저 창에서 QR 스캔을 완료했는지 확인해 주세요.');
       }
@@ -196,7 +203,7 @@ export class GoogleMessagesAutomation {
 
       // 1. '채팅 시작' / '대화 시작' 버튼 탐색
       try {
-        const startChatButton = this.page!.locator('button:has-text("시작"), a:has-text("시작"), [aria-label*="시작"], button:has-text("Start chat")').first();
+        const startChatButton = this.page!.locator('button:has-text("시작"), a:has-text("시작"), [aria-label*="시작"], button:has-text("Start chat"), a:has-text("Start chat"), [aria-label*="Start chat"]').first();
         await startChatButton.waitFor({ state: 'visible', timeout: 5000 });
         await startChatButton.click({ timeout: 2000 });
       } catch (e: any) {

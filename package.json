@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "reset-db": "node reset-db.js"
   },
   "dependencies": {
     "@vladmandic/face-api": "^1.7.15",
@@ -19,7 +20,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@egdesk/next-api-plugin": "^1.5.3",
+    "@egdesk/next-api-plugin": "^1.5.4",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

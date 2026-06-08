@@ -239,6 +239,12 @@ export default function SettingsPage() {
       alert('테스트할 학생 ID를 입력해주세요.');
       return;
     }
+
+    if (hasChanges) {
+      const wantSave = confirm('변경된 설정이 있습니다. 설정을 먼저 저장하고 테스트 문자를 발송하시겠습니까?');
+      if (!wantSave) return;
+      await handleSave();
+    }
     
     setIsTesting(true);
     setTestStatus('발송 중... (약 5~10초 소요)');
@@ -257,6 +263,11 @@ export default function SettingsPage() {
         setTestStatus(`발송 실패: ${errorMsg}`);
       }
     } catch (err: any) {
+      if (err.message && err.message.includes('was not found on the server')) {
+        alert('서버 최적화가 완료되어 화면을 새로고침합니다. 확인을 누른 후 다시 문자를 발송해 주세요!');
+        window.location.reload();
+        return;
+      }
       setTestStatus(`오류 발생:\n시스템 상태를 확인해 주세요 (${err.message})`);
     } finally {
       setIsTesting(false);
@@ -328,17 +339,17 @@ export default function SettingsPage() {
             <div className="w-12 h-12 bg-slate-100 text-slate-800 rounded-2xl flex items-center justify-center shadow-inner border border-slate-200">
               <Users size={24} strokeWidth={2} />
             </div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">수련 반(Class) 관리</h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">소속/부서별 관리</h2>
           </div>
 
           <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100 mb-8">
-            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 mb-3 block">새로운 반 추가</label>
+            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 mb-3 block">새로운 부서/조직</label>
             <div className="flex gap-3">
               <input
                 type="text"
                 value={newClassName}
                 onChange={(e) => setNewClassName(e.target.value)}
-                placeholder="예: 주말 심화반, 성인부 등"
+                placeholder="예: 영업부, 경영부"
                 className="flex-1 bg-white border-2 border-slate-200 rounded-[20px] px-8 py-6 font-bold text-slate-900 focus:border-blue-500 outline-none transition-all"
               />
               <button
@@ -394,7 +405,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="bg-slate-50/50 p-6 rounded-[32px] border border-slate-100 group transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/30">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-4 block group-hover:text-blue-500">자동 하원 처리 시간</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-4 block group-hover:text-blue-500">자동 퇴근 처리 시간</label>
               <div className="flex items-center gap-3">
                 <input
                   type="number"
@@ -405,7 +416,7 @@ export default function SettingsPage() {
                 />
                 <span className="font-bold text-slate-600 text-sm">분 이후</span>
               </div>
-              <p className="mt-4 text-[11px] text-slate-400 font-medium leading-relaxed">등원 후 설정된 시간이 지나고 다시 얼굴이 인식되면 자동으로 하원 처리됩니다.</p>
+              <p className="mt-4 text-[11px] text-slate-400 font-medium leading-relaxed">출근 후 설정된 시간이 지나고 다시 얼굴이 인식되면 자동으로 퇴근 처리됩니다.</p>
             </div>
           </div>
         </div>
@@ -420,7 +431,7 @@ export default function SettingsPage() {
                 <MessageSquare size={24} strokeWidth={2} />
               </div>
               <div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">학부모 알림 문자 설정</h2>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">알림 문자 설정</h2>
                 <p className="text-[10px] text-slate-400 font-bold">Google 메시지(Web) 연동</p>
               </div>
             </div>
@@ -506,7 +517,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="flex items-center justify-between ml-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">등원 알림 메시지</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">출근 알림 메시지</label>
                   <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded">사용 가능 변수: {'{name}, {time}, {parent}'}</span>
                 </div>
                 <textarea
@@ -519,7 +530,7 @@ export default function SettingsPage() {
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between ml-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">하원 알림 메시지</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">퇴근 알림 메시지</label>
                   <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded">사용 가능 변수: {'{name}, {time}, {parent}'}</span>
                 </div>
                 <textarea

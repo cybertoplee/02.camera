@@ -3,6 +3,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useCamera } from '@/lib/useCamera';
 import { ArrowLeft, User, TriangleAlert, CheckCircle, Loader2, MonitorPlay, UserPlus, Home, Camera } from 'lucide-react';
 // import * as faceapi from '@vladmandic/face-api'; // 제거 후 useEffect 내 동적 임포트 사용
 import { queryTable, insertRows, aggregateTable, executeSQL } from '@root/egdesk-helpers';
@@ -36,7 +37,8 @@ export default function AttendanceMonitorPage() {
   const autoCheckoutMinutesRef = useRef(10);
   const smsEnabledRef = useRef(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
-  const [isCameraOn, setIsCameraOn] = useState(false);
+  const { stream, error: camError, start, stop, toggle } = useCamera();
+  const isCameraOn = !!stream;
   const [cameraFilters, setCameraFilters] = useState('brightness(1.10) contrast(1.10) saturate(1.00)');
 
   // 실시간 카메라 자동 노출(밝기/채도/대비) 조절 로직
@@ -124,6 +126,12 @@ export default function AttendanceMonitorPage() {
   const isPageMounted = useRef(true);
 
   useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream || null;
+    }
+  }, [stream]);
+
+  useEffect(() => {
     isPageMounted.current = true;
     setMounted(true);
 
@@ -204,31 +212,21 @@ export default function AttendanceMonitorPage() {
     return () => {
       isPageMounted.current = false;
       clearInterval(timer);
-      stopVideo();
+      stop();
     };
   }, []);
 
-  const stopVideo = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      const tracks = stream.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-      console.log('Webcam stream stopped');
-    }
-  };
+  // stopVideo removed; use hook's stop instead
 
-  const toggleCamera = () => {
+  const toggleCamera = async () => {
     if (isCameraOn) {
-      stopVideo();
-      setIsCameraOn(false);
+      stop();
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
     } else {
-      setIsCameraOn(true);
-      startVideo();
+      await start();
     }
   };
 
@@ -243,24 +241,9 @@ export default function AttendanceMonitorPage() {
     if (videoRef.current?.srcObject) return; // Already active
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 1280 }, 
-          height: { ideal: 720 },
-          facingMode: 'user'
-        } 
-      });
-
-      if (!isPageMounted.current) {
-        stream.getTracks().forEach(track => track.stop());
-        return;
-      }
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        console.log('Webcam stream started');
-        setCameraError('');
-      }
+      await start();
+      console.log('Webcam stream started');
+      setCameraError('');
     } catch (err: any) {
       console.error('Webcam access error:', err);
       if (isPageMounted.current) {
@@ -282,7 +265,7 @@ export default function AttendanceMonitorPage() {
   };
 
   useEffect(() => {
-    // 자동 실행 해제: 사용자가 직접 ON 버튼을 눌러야 실행됨
+    // No automatic start; user triggers via toggleCamera
   }, [isModelLoaded]);
 
   // 실시간 얼굴 인식 루프
@@ -297,7 +280,7 @@ export default function AttendanceMonitorPage() {
       
       // Stricter check: video must be ready AND have positive dimensions AND be playing
       const video = videoRef.current;
-      if (!video || video.readyState < 3 || video.videoWidth === 0 || video.paused) {
+      if (!video || video.readyState < 3 || !video.videoWidth || !video.videoHeight || video.videoWidth === 0 || video.videoHeight === 0 || video.paused) {
         requestAnimationFrame(recognitionLoop);
         return;
       }

@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, ClipboardList, Settings, ScanFace } from 'lucide-react';
+import { Home, Users, ClipboardList, Settings, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
 
   const tabs = [
+    { name: '홈', href: '/', icon: Home },
     { name: '출결 기록', href: '/m/attendance', icon: ClipboardList },
     { name: '관원 목록', href: '/m/students', icon: Users },
     { name: '출석 모니터', href: '/attendance', icon: ScanFace },
