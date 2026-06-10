@@ -320,6 +320,11 @@
         
         let liveDurationInterval = null;
 
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let currentChunkStart = null;
+        let recordSplitInterval = null;
+
         // Restore configuration on startup
         window.addEventListener('DOMContentLoaded', () => {
             // Keep dynamic clock ticking for security style
@@ -331,13 +336,6 @@
                     statusEl.innerText = `CAM_01 | ${timeStr}`;
                 }
             }, 1000);
-
-            // Periodically sync recording to SQLite DB
-            setInterval(() => {
-                if (isRecording) {
-                    syncRecordingProgress();
-                }
-            }, 5000);
 
             let savedPath = localStorage.getItem('cctv_save_path');
             if (!savedPath) {
@@ -460,36 +458,166 @@
             }, 1000);
         }
 
+        function startActualRecording() {
+            if (!stream) return;
+            try {
+                let mimeType = 'video/webm;codecs=vp8';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'video/webm';
+                }
+                
+                mediaRecorder = new MediaRecorder(stream, { mimeType });
+                recordedChunks = [];
+                currentChunkStart = new Date();
+
+                mediaRecorder.ondataavailable = function(e) {
+                    if (e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async function() {
+                    if (recordedChunks.length > 0) {
+                        const blob = new Blob(recordedChunks, { type: mimeType });
+                        await uploadAndSaveRecord(blob, currentChunkStart);
+                        recordedChunks = [];
+                    }
+                };
+
+                mediaRecorder.start();
+
+            } catch (e) {
+                console.error('MediaRecorder error:', e);
+            }
+        }
+
+        async function uploadAndSaveRecord(blob, startTime) {
+            try {
+                const formData = new FormData();
+                formData.append('file', blob, 'video.webm');
+                const targetFolder = localStorage.getItem('cctv_save_path') || '';
+                formData.append('targetFolder', targetFolder);
+
+                const upRes = await fetch('../api/cctv/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const upData = await upRes.json();
+                
+                if (!upData.success) {
+                    console.error('Upload failed:', upData.error);
+                    return;
+                }
+
+                const fileUrl = upData.url;
+                const sizeMB = (blob.size / (1024 * 1024)).toFixed(1) + ' MB';
+                
+                const d = startTime;
+                const dateStr = d.getFullYear() + 
+                    String(d.getMonth()+1).padStart(2,'0') + 
+                    String(d.getDate()).padStart(2,'0') + "_" + 
+                    String(d.getHours()).padStart(2,'0') + 
+                    String(d.getMinutes()).padStart(2,'0');
+                const filename = `REC_${dateStr}.webm`;
+
+                await fetch('../api/cctv/records', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date: startTime.toLocaleString(),
+                        filename: filename,
+                        size: sizeMB,
+                        url: fileUrl
+                    })
+                });
+                
+                loadRecords();
+            } catch (e) {
+                console.error('Failed to save record chunk:', e);
+            }
+        }
+
+        let previousFrameData = null;
+        let motionCanvas = null;
+        let motionCtx = null;
+        let motionTimeout = null;
+
+        function checkMotion() {
+            if (!stream || !isRecording) return;
+            const video = document.getElementById('video-stream');
+            if (video.readyState < 2) return;
+
+            if (!motionCanvas) {
+                motionCanvas = document.createElement('canvas');
+                motionCanvas.width = 160;
+                motionCanvas.height = 120;
+                motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
+            }
+
+            motionCtx.drawImage(video, 0, 0, motionCanvas.width, motionCanvas.height);
+            const frame = motionCtx.getImageData(0, 0, motionCanvas.width, motionCanvas.height);
+            
+            if (!previousFrameData) {
+                previousFrameData = frame.data;
+                return;
+            }
+
+            let diffCount = 0;
+            const len = frame.data.length;
+            for (let i = 0; i < len; i += 4) {
+                const rDiff = Math.abs(frame.data[i] - previousFrameData[i]);
+                const gDiff = Math.abs(frame.data[i+1] - previousFrameData[i+1]);
+                const bDiff = Math.abs(frame.data[i+2] - previousFrameData[i+2]);
+                if (rDiff + gDiff + bDiff > 100) {
+                    diffCount++;
+                }
+            }
+            previousFrameData = new Uint8ClampedArray(frame.data);
+
+            const isAnomaly = (diffCount / (motionCanvas.width * motionCanvas.height)) > 0.05;
+            
+            const focusFrame = document.getElementById('focus-frame');
+            const eventBeacon = document.getElementById('event-beacon');
+
+            if (isAnomaly) {
+                focusFrame.style.display = 'block';
+                focusFrame.style.left = (Math.random()*60+10) + '%';
+                focusFrame.style.top = (Math.random()*60+10) + '%';
+                eventBeacon.classList.remove('hidden');
+                try { alarmSound.play(); } catch(e) {}
+
+                const now = Date.now();
+                if (now - lastEventTime > 8000) {
+                    lastEventTime = now;
+                    recordAnomalyEvent();
+                }
+
+                if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                    startActualRecording();
+                }
+
+                if (motionTimeout) clearTimeout(motionTimeout);
+                motionTimeout = setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+                }, 10000);
+
+            } else {
+                focusFrame.style.display = 'none';
+                eventBeacon.classList.add('hidden');
+                alarmSound.pause();
+            }
+        }
+
         function startDetection() {
             if (detectionInterval) clearInterval(detectionInterval);
-            detectionInterval = setInterval(async () => {
-                const isAnomaly = Math.random() > 0.7;
-                const focusFrame = document.getElementById('focus-frame');
-                const eventBeacon = document.getElementById('event-beacon');
-
-                if (isAnomaly) {
-                    focusFrame.style.display = 'block';
-                    focusFrame.style.left = (Math.random()*60+10) + '%';
-                    focusFrame.style.top = (Math.random()*60+10) + '%';
-                    eventBeacon.classList.remove('hidden');
-                    try { alarmSound.play(); } catch(e) {}
-
-                    const now = Date.now();
-                    if (now - lastEventTime > 8000) {
-                        lastEventTime = now;
-                        await recordAnomalyEvent();
-                    }
-                } else {
-                    focusFrame.style.display = 'none';
-                    eventBeacon.classList.add('hidden');
-                    alarmSound.pause();
-                }
-            }, 3000);
+            detectionInterval = setInterval(checkMotion, 500);
         }
 
         async function recordAnomalyEvent() {
             const video = document.getElementById('video-stream');
-            let snapshotBase64 = "";
+            let snapshotUrl = "";
 
             try {
                 const canvas = document.createElement('canvas');
@@ -498,7 +626,19 @@
                 const ctx = canvas.getContext('2d');
                 if (ctx && video.readyState >= 2) {
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    snapshotBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                    
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                    if (blob) {
+                        const formData = new FormData();
+                        formData.append('file', blob, 'snapshot.jpg');
+                        const targetFolder = localStorage.getItem('cctv_save_path') || '';
+                        formData.append('targetFolder', targetFolder);
+                        const res = await fetch('../api/cctv/upload', { method: 'POST', body: formData });
+                        const upData = await res.json();
+                        if (upData.success) {
+                            snapshotUrl = upData.url;
+                        }
+                    }
                 }
             } catch(e) { console.error('Snapshot failed', e); }
 
@@ -509,65 +649,12 @@
                     body: JSON.stringify({
                         timestamp: new Date().toLocaleString(),
                         type: '움직임 이상 감지',
-                        snapshot: snapshotBase64,
+                        snapshot: snapshotUrl,
                         video_url: '#'
                     })
                 });
-                // Refresh events list after saving
                 loadEvents();
             } catch (err) { console.error('Failed to save event to DB', err); }
-        }
-
-        async function syncRecordingProgress() {
-            if (!isRecording || !recStartTime || !recSessionId) return;
-
-            const now = new Date();
-            const diffMs = now - recStartTime;
-            const seconds = Math.floor(diffMs / 1000);
-            
-            const recordsToSync = [];
-            // Split into 30-minute blocks (1800 seconds)
-            const blocksCount = Math.max(1, Math.ceil(seconds / 1800));
-            
-            for (let i = 0; i < blocksCount; i++) {
-                const blockStart = new Date(recStartTime.getTime() + i * 30 * 60 * 1000);
-                let durationInSecs = 1800;
-                if (i === blocksCount - 1) {
-                    durationInSecs = seconds - (i * 1800);
-                }
-                
-                const size = (durationInSecs * 0.1).toFixed(1) + " MB";
-                
-                // Construct filename like REC_20260603_1200_Part1.mp4
-                const blockDateStr = blockStart.getFullYear() + 
-                    String(blockStart.getMonth()+1).padStart(2,'0') + 
-                    String(blockStart.getDate()).padStart(2,'0') + "_" + 
-                    String(blockStart.getHours()).padStart(2,'0') + 
-                    String(blockStart.getMinutes()).padStart(2,'0');
-                const filename = `REC_${blockDateStr}_Part${i+1}.mp4`;
-                
-                recordsToSync.push({
-                    date: blockStart.toLocaleString(),
-                    filename,
-                    size,
-                    url: 'https://assets.mixkit.co/videos/preview/mixkit-security-camera-footage-of-a-corridor-in-a-building-42171-large.mp4'
-                });
-            }
-
-            try {
-                await fetch('../api/cctv/records', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sync: true,
-                        records: recordsToSync
-                    })
-                });
-                // Refresh records list after syncing
-                loadRecords();
-            } catch(err) {
-                console.error('Failed syncing blocks to DB', err);
-            }
         }
 
         async function stopCamera() {
@@ -579,6 +666,10 @@
                 clearInterval(liveDurationInterval);
                 liveDurationInterval = null;
             }
+            if (recordSplitInterval) {
+                clearInterval(recordSplitInterval);
+                recordSplitInterval = null;
+            }
             
             document.getElementById('focus-frame').style.display = 'none';
             document.getElementById('event-beacon').classList.add('hidden');
@@ -587,15 +678,17 @@
             document.getElementById('rec-indicator').classList.add('hidden');
             document.getElementById('bg-rec-status').classList.add('hidden');
 
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+
             if (stream) {
                 stream.getTracks().forEach(t => t.stop());
                 stream = null;
                 document.getElementById('video-stream').srcObject = null;
             }
 
-            // Sync one final time to capture all blocks before clearing state
             if (isRecording) {
-                await syncRecordingProgress();
                 isRecording = false;
                 recStartTime = null;
                 recSessionId = null;
