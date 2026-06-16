@@ -55,6 +55,19 @@ export default function RootLayout({
             `,
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('unhandledrejection', function(event) {
+                if (event.reason && typeof event.reason === 'object' && !(event.reason instanceof Error)) {
+                  console.warn('Suppressed Non-Error Object Rejection:', event.reason);
+                  event.preventDefault();
+                  event.stopImmediatePropagation();
+                }
+              }, true);
+            `,
+          }}
+        />
       </head>
       <body className="min-h-full" suppressHydrationWarning style={{ margin: 0, padding: 0 }}>
         <MobileRedirect />

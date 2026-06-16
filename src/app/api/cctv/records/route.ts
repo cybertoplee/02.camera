@@ -1,5 +1,29 @@
 import { NextResponse } from 'next/server';
-import { queryTable, insertRows, updateRows } from '@root/egdesk-helpers';
+import { queryTable, insertRows, updateRows, deleteRows } from '@root/egdesk-helpers';
+import fs from 'fs';
+import path from 'path';
+
+function deletePhysicalFile(fileUrl: string) {
+  try {
+    let filePath = '';
+    if (fileUrl.startsWith('/cctv_uploads/')) {
+      filePath = path.join(process.cwd(), 'public', fileUrl);
+    } else if (fileUrl.startsWith('/api/cctv/serve?file=')) {
+      const parsedUrl = new URL(fileUrl, 'http://localhost');
+      const paramFile = parsedUrl.searchParams.get('file');
+      if (paramFile) {
+        filePath = paramFile;
+      }
+    }
+    
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`[CCTV] deleted file: ${filePath}`);
+    }
+  } catch (err) {
+    console.error(`[CCTV] failed to delete file: ${fileUrl}`, err);
+  }
+}
 
 export async function GET() {
   try {
@@ -33,6 +57,30 @@ export async function POST(request: Request) {
       const result = await insertRows('cctv_records', [{ date, filename, size, url }]);
       return NextResponse.json({ success: true, result });
     }
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { ids } = await request.json();
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ success: false, error: 'No IDs provided' }, { status: 400 });
+    }
+
+    const recordsRes = await queryTable('cctv_records');
+    const records = recordsRes.rows || [];
+    const targetRecords = records.filter((r: any) => ids.includes(r.id));
+
+    for (const record of targetRecords) {
+      if (record.url) {
+        deletePhysicalFile(record.url);
+      }
+    }
+
+    await deleteRows('cctv_records', { ids });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

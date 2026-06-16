@@ -83,15 +83,17 @@ export class GoogleMessagesAutomation {
     this.page = pages.length > 0 ? pages[0] : await this.context.newPage();
     this.page.setDefaultTimeout(60000);
 
-    // 메모리 절약을 위한 리소스 차단 (OOM 크래시 방지)
-    await this.page.route('**/*', (route) => {
-      const type = route.request().resourceType();
-      if (['image', 'media', 'font'].includes(type)) {
-        route.abort();
-      } else {
-        route.continue();
-      }
-    });
+    // 메모리 절약을 위한 리소스 차단 (OOM 크래시 방지) - Headless 모드에서만 적용
+    if (headless) {
+      await this.page.route('**/*', (route) => {
+        const type = route.request().resourceType();
+        if (['image', 'media', 'font'].includes(type)) {
+          route.abort();
+        } else {
+          route.continue();
+        }
+      });
+    }
 
     // 페이지 충돌 리스너 추가
     this.page.on('crash', () => {
@@ -101,6 +103,11 @@ export class GoogleMessagesAutomation {
 
     // 기본 주소로 접속 (이미 로그인된 경우 대화 목록으로 바로 이동됨)
     await this.page!.goto('https://messages.google.com/web', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    
+    // UI 모드일 경우 사용자가 바로 볼 수 있도록 탭을 최상단으로 끌어올림
+    if (!headless) {
+      try { await this.page!.bringToFront(); } catch (e) {}
+    }
 
     // 웰컴 페이지가 뜨는 경우 '로그인' 버튼 클릭
     try {
@@ -156,6 +163,18 @@ export class GoogleMessagesAutomation {
     } catch (err) {
       // 무시
     }
+
+    // 페어링 필요한지 확인 (QR 코드가 있는지 검사)
+    try {
+      const isQrCodeVisible = await this.page!.waitForSelector('mw-qr-code, [data-e2e="qr-code"], button:has-text("기기 페어링"), a:has-text("기기 페어링")', { timeout: 3000 }).catch(() => null);
+      if (isQrCodeVisible && headless) {
+        console.log('[GoogleMessages] QR 코드/페어링 화면이 감지되었습니다. 연동 해제 상태입니다.');
+        // 자동 페어링을 위해 브라우저를 띄우지 않고 그대로 둡니다.
+        // sendSMS에서 이 상태를 감지하고 에러를 발생시킵니다.
+      }
+    } catch (e) {
+      // 무시
+    }
   }
 
   /**
@@ -178,13 +197,18 @@ export class GoogleMessagesAutomation {
         throw new Error('연동 확인 시간이 초과되었습니다. 브라우저 창에서 QR 스캔을 완료했는지 확인해 주세요.');
       }
       
-      // Persistent context에서는 IndexedDB와 로컬스토리지가 자동 저장되므로 별도의 storageState 저장이 필요하지 않습니다.
-      console.log('[GoogleMessages] 연동 성공 및 세션 저장 완료!');
+      console.log('[GoogleMessages] 연동 성공 확인! 세션 저장을 위해 잠시 대기...');
+      // 프로필(IndexedDB 등)이 디스크에 완벽하게 쓰여지도록 약간 대기 후 안전 종료
+      await this.page.waitForTimeout(3000);
+      await this.close();
+      
+      console.log('[GoogleMessages] 연동 성공 및 세션(프로필) 영구 저장 완료!');
       return { success: true };
     } catch (err: any) {
       console.error('[GoogleMessages] setupConnection 오류:', err);
       // 브라우저가 열리지 않는 경우 등을 대비해 에러 메시지 세분화
       const errorMessage = err.message || '알 수 없는 오류가 발생했습니다.';
+      try { await this.close(); } catch(e){} // 에러 시에도 안전 종료
       return { success: false, error: errorMessage };
     }
   }
@@ -201,6 +225,16 @@ export class GoogleMessagesAutomation {
       
       console.log(`[GoogleMessages] 메시지 발송 시작: ${phoneNumber}`);
 
+      // 0. 연동 상태(QR 화면 등)인지 먼저 확인
+      try {
+        const qrCode = await this.page!.waitForSelector('mw-qr-code, [data-e2e="qr-code"], button:has-text("기기 페어링"), a:has-text("기기 페어링")', { timeout: 2000 }).catch(() => null);
+        if (qrCode) {
+          throw new Error('기기 연동이 해제되었습니다. [기기 연동하기] 버튼을 눌러 다시 연결해 주세요.');
+        }
+      } catch (e: any) {
+        if (e.message.includes('기기 연동')) throw e;
+      }
+
       // 1. '채팅 시작' / '대화 시작' 버튼 탐색
       try {
         const startChatButton = this.page!.locator('button:has-text("시작"), a:has-text("시작"), [aria-label*="시작"], button:has-text("Start chat"), a:has-text("Start chat"), [aria-label*="Start chat"]').first();
@@ -215,8 +249,19 @@ export class GoogleMessagesAutomation {
       // 2. 전화번호 입력창 입력
       await this.page!.waitForTimeout(500);
       const searchInput = await this.page!.locator('input[placeholder*="이름"], input[placeholder*="번호"], input[aria-label*="전화번호"], input[placeholder*="name"], input[placeholder*="number"]').first();
-      await searchInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      await searchInput.focus({ timeout: 2000 }).catch(() => {});
+      
+      try {
+        await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+        await searchInput.focus({ timeout: 2000 });
+      } catch (e: any) {
+        // 검색창을 찾을 수 없다면 연동이 풀렸을 가능성이 큼
+        const url = this.page!.url();
+        if (url.includes('welcome') || url.includes('about')) {
+           throw new Error('기기 연동이 해제되었습니다. [기기 연동하기] 버튼을 눌러 다시 연결해 주세요.');
+        }
+        throw e;
+      }
+
       await this.page!.keyboard.type(phoneNumber, { delay: 50 });
       await this.page!.waitForTimeout(500);
       

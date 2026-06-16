@@ -191,10 +191,16 @@
         <div id="records-page" class="page hidden w-full max-w-4xl">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-blue-400 tracking-tight">녹화 보관함 (30분 파일 분할)</h2>
-                <button onclick="loadRecords()" class="bg-gray-900/50 hover:bg-gray-900 px-4 py-2 border border-gray-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"/></svg>
-                    새로고침
-                </button>
+                <div class="flex items-center gap-3">
+                    <button onclick="deleteSelectedRecords()" class="bg-red-950/50 hover:bg-red-900 border border-red-500/30 text-red-400 hover:text-red-300 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-[0_4px_15px_rgba(239,68,68,0.15)] active:scale-95 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        선택 삭제
+                    </button>
+                    <button onclick="loadRecords()" class="bg-gray-900/50 hover:bg-gray-900 px-4 py-2 border border-gray-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"/></svg>
+                        새로고침
+                    </button>
+                </div>
             </div>
             <div class="cyber-panel rounded-2xl overflow-hidden">
                 <div class="overflow-x-auto">
@@ -205,6 +211,7 @@
                                 <th class="p-4 text-xs font-bold uppercase tracking-wider">파일명</th>
                                 <th class="p-4 text-xs font-bold uppercase tracking-wider">용량</th>
                                 <th class="p-4 text-xs font-bold uppercase tracking-wider text-right">기능</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider text-right w-12"><input type="checkbox" id="all-records-checkbox" onclick="toggleAllRecords(this.checked)" class="w-4 h-4 rounded bg-gray-900 border-gray-700"></th>
                             </tr>
                         </thead>
                         <tbody id="record-list" class="divide-y divide-gray-850">
@@ -219,10 +226,16 @@
         <div id="events-page" class="page hidden w-full max-w-4xl">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black text-red-400 tracking-tight">지능형 이상 감지 로그</h2>
-                <button onclick="loadEvents()" class="bg-gray-900/50 hover:bg-gray-900 px-4 py-2 border border-gray-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"/></svg>
-                    새로고침
-                </button>
+                <div class="flex items-center gap-3">
+                    <button onclick="deleteSelectedEvents()" class="bg-red-950/50 hover:bg-red-900 border border-red-500/30 text-red-400 hover:text-red-300 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-[0_4px_15px_rgba(239,68,68,0.15)] active:scale-95 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        선택 삭제
+                    </button>
+                    <button onclick="loadEvents()" class="bg-gray-900/50 hover:bg-gray-900 px-4 py-2 border border-gray-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"/></svg>
+                        새로고침
+                    </button>
+                </div>
             </div>
             <div class="cyber-panel rounded-2xl overflow-hidden">
                 <div class="overflow-x-auto">
@@ -233,6 +246,7 @@
                                 <th class="p-4 text-xs font-bold uppercase tracking-wider">감지 유형</th>
                                 <th class="p-4 text-xs font-bold uppercase tracking-wider">스냅샷</th>
                                 <th class="p-4 text-xs font-bold uppercase tracking-wider text-right">상태</th>
+                                <th class="p-4 text-xs font-bold uppercase tracking-wider text-right w-12"><input type="checkbox" id="all-events-checkbox" onclick="toggleAllEvents(this.checked)" class="w-4 h-4 rounded bg-gray-900 border-gray-700"></th>
                             </tr>
                         </thead>
                         <tbody id="event-list" class="divide-y divide-gray-850">
@@ -794,7 +808,7 @@
 
         async function loadRecords() {
             const list = document.getElementById('record-list');
-            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500 font-bold">데이터 분석 및 동기화 중...</td></tr>`;
+            list.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500 font-bold">데이터 분석 및 동기화 중...</td></tr>`;
 
             try {
                 const res = await fetch('../api/cctv/records');
@@ -811,21 +825,24 @@
                             <td class="p-4 text-sm text-right">
                                 <button onclick="playVideo('${r.url || 'https://assets.mixkit.co/videos/preview/mixkit-security-camera-footage-of-a-corridor-in-a-building-42171-large.mp4'}', '${r.filename}')" class="bg-blue-600 hover:bg-blue-500 hover:shadow-[0_0_12px_rgba(59,130,246,0.3)] text-white px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95">재생</button>
                             </td>
+                            <td class="p-4 text-sm text-right">
+                                <input type="checkbox" class="record-select-checkbox w-4 h-4 rounded bg-gray-900 border-gray-700" data-id="${r.id}">
+                            </td>
                         `;
                         list.appendChild(tr);
                     });
                     if (data.rows.length === 0) {
-                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-600 font-bold">저장된 녹화 정보가 없습니다.</td></tr>`;
+                        list.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-600 font-bold">저장된 녹화 정보가 없습니다.</td></tr>`;
                     }
                 }
             } catch(e) {
-                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500 font-bold">기록 불러오기 실패</td></tr>`;
+                list.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-500 font-bold">기록 불러오기 실패</td></tr>`;
             }
         }
 
         async function loadEvents() {
             const list = document.getElementById('event-list');
-            list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500 font-bold">이벤트 로그 읽는 중...</td></tr>`;
+            list.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500 font-bold">이벤트 로그 읽는 중...</td></tr>`;
 
             try {
                 const res = await fetch('../api/cctv/events');
@@ -847,15 +864,98 @@
                             <td class="p-4 text-sm text-right">
                                 <span class="bg-red-950/40 border border-red-800/50 text-red-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">Warning</span>
                             </td>
+                            <td class="p-4 text-sm text-right">
+                                <input type="checkbox" class="event-select-checkbox w-4 h-4 rounded bg-gray-900 border-gray-700" data-id="${r.id}">
+                            </td>
                         `;
                         list.appendChild(tr);
                     });
                     if (data.rows.length === 0) {
-                        list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-600 font-bold">감지된 이상 이벤트가 없습니다.</td></tr>`;
+                        list.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-600 font-bold">감지된 이상 이벤트가 없습니다.</td></tr>`;
                     }
                 }
             } catch(e) {
-                list.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500 font-bold">이벤트 불러오기 실패</td></tr>`;
+                list.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-500 font-bold">이벤트 불러오기 실패</td></tr>`;
+            }
+        }
+
+        async function syncRecordingProgress() {
+            return Promise.resolve();
+        }
+
+        function toggleAllRecords(checked) {
+            document.querySelectorAll('.record-select-checkbox').forEach(cb => cb.checked = checked);
+        }
+
+        function toggleAllEvents(checked) {
+            document.querySelectorAll('.event-select-checkbox').forEach(cb => cb.checked = checked);
+        }
+
+        async function deleteSelectedRecords() {
+            const selected = Array.from(document.querySelectorAll('.record-select-checkbox:checked'))
+                .map(cb => parseInt(cb.getAttribute('data-id'), 10));
+
+            if (selected.length === 0) {
+                alert('삭제할 녹화 기록을 선택해 주세요.');
+                return;
+            }
+
+            if (!confirm(`선택한 ${selected.length}개의 녹화 파일을 정말 삭제하시겠습니까? 저장 장소에서도 영구히 제거됩니다.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch('../api/cctv/records', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: selected })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('성공적으로 삭제되었습니다.');
+                    const allCb = document.getElementById('all-records-checkbox');
+                    if (allCb) allCb.checked = false;
+                    loadRecords();
+                } else {
+                    alert('삭제 중 오류 발생: ' + data.error);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('삭제 요청 실패');
+            }
+        }
+
+        async function deleteSelectedEvents() {
+            const selected = Array.from(document.querySelectorAll('.event-select-checkbox:checked'))
+                .map(cb => parseInt(cb.getAttribute('data-id'), 10));
+
+            if (selected.length === 0) {
+                alert('삭제할 이벤트 로그를 선택해 주세요.');
+                return;
+            }
+
+            if (!confirm(`선택한 ${selected.length}개의 이벤트 로그를 정말 삭제하시겠습니까? 스냅샷 이미지도 영구히 제거됩니다.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch('../api/cctv/events', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: selected })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('성공적으로 삭제되었습니다.');
+                    const allCb = document.getElementById('all-events-checkbox');
+                    if (allCb) allCb.checked = false;
+                    loadEvents();
+                } else {
+                    alert('삭제 중 오류 발생: ' + data.error);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('삭제 요청 실패');
             }
         }
     </script>

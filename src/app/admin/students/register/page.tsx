@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ClipboardEdit, Camera, Home } from 'lucide-react';
 import { insertRows, queryTable, executeSQL } from '@root/egdesk-helpers';
+import { sendAttendanceSMSAction } from '@/app/actions/sms';
 interface CustomField {
   id: number;
   field_name: string;
@@ -312,11 +313,31 @@ const fetchCustomFields = async () => {
         return;
       }
 
-      await insertRows('students', [insertData]);
+      const insertResult = await insertRows('students', [insertData]);
+
+      // 방금 삽입된 학생 ID를 가져옵니다 (insertResult 에 ID가 포함된다고 가정)
+      let newStudentId: number | null = null;
+      if (insertResult && insertResult.rows && insertResult.rows[0] && insertResult.rows[0].id) {
+        newStudentId = insertResult.rows[0].id;
+      } else {
+        // fallback: 이름+생년일로 조회
+        const fetchRes = await queryTable('students', { filters: { name: formData.name, birth_date: formData.birthDate } });
+        if (fetchRes.rows && fetchRes.rows.length > 0) newStudentId = fetchRes.rows[0].id;
+      }
 
       setStatus('등록 완료!');
       alert(`${formData.name} 학생이 성공적으로 등록되었습니다.`);
-      
+
+      // 자동 SMS 발송 (입학 알림 예시, IN 타입 사용)
+      if (newStudentId) {
+        try {
+          const smsRes = await sendAttendanceSMSAction(newStudentId, 'IN');
+          console.log('[등록] 자동 SMS 전송 결과:', smsRes);
+        } catch (e) {
+          console.error('[등록] 자동 SMS 전송 실패:', e);
+        }
+      }
+
       // 카메라 끄기 및 상태 초기화
       stop();
       setIsFaceDetected(false);
@@ -451,7 +472,7 @@ const fetchCustomFields = async () => {
             </div>
 
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">소속</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">직책/직급</label>
               <input
                 name="rank"
                 value={formData.rank}
@@ -462,7 +483,7 @@ const fetchCustomFields = async () => {
             </div>
 
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">직책/직급</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">소속</label>
               <select
                 name="classId"
                 value={formData.classId}

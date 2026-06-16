@@ -43,7 +43,7 @@ export default function AttendanceManagementPage() {
 
   const handleBatchProcess = async (type: 'IN' | 'OUT', targetStudentIds: number[]) => {
     if (targetStudentIds.length === 0) return;
-    if (!confirm(`${targetStudentIds.length}명의 회원을 일괄 ${type === 'IN' ? '등원' : '하원'} 처리하시겠습니까?${sendSmsOnBatch ? '\n문자 발송이 설정된 회원은 자동으로 문자가 발송됩니다.' : ''}`)) return;
+    if (!confirm(`${targetStudentIds.length}명의 회원을 일괄 ${type === 'IN' ? '출근' : '퇴근'} 처리하시겠습니까?${sendSmsOnBatch ? '\n문자 발송이 설정된 회원은 자동으로 문자가 발송됩니다.' : ''}`)) return;
 
     setIsProcessing(true);
     try {
@@ -61,7 +61,7 @@ export default function AttendanceManagementPage() {
         });
       }
 
-      alert(`일괄 ${type === 'IN' ? '등원' : '하원'} 처리가 시작되었습니다.`);
+      alert(`일괄 ${type === 'IN' ? '출근' : '퇴근'} 처리가 시작되었습니다.`);
     } catch (err) {
       console.error(err);
       alert('처리 중 오류가 발생했습니다.');
@@ -122,7 +122,7 @@ export default function AttendanceManagementPage() {
       setClassMap(cmap);
 
       const studentsRes = await queryTable('students');
-      const studentMap = new Map((studentsRes.rows || []).map((s: any) => [s.id, s]));
+      const studentMap = new Map((studentsRes.rows || []).map((s: any) => [String(s.id), s]));
       setStudents(studentsRes.rows || []);
 
       const targetDate = selectedDate || (() => {
@@ -137,10 +137,10 @@ export default function AttendanceManagementPage() {
       `);
 
       const formattedLogs = (logsRes.rows || []).map((log: any) => {
-        const student = studentMap.get(log.student_id);
+        const student = studentMap.get(String(log.student_id));
         return {
           ...log,
-          student_name: student?.name || `ID: ${log.student_id}`,
+          student_name: student ? `ID: ${log.student_id} ${student.name}` : `ID: ${log.student_id}`,
           parent_name: student?.parent_name || '',
           parent_phone: student?.parent_phone || '',
           class_name: student ? (cmap[student.class_id] || '') : ''
@@ -199,7 +199,7 @@ export default function AttendanceManagementPage() {
     const daysInMonth = new Date(year, month, 0).getDate();
     
     // 헤더 생성
-    const headers = ['회원 이름', '수련반', '등원횟수'];
+    const headers = ['회원 이름', '수련반', '출근횟수'];
     for (let i = 1; i <= daysInMonth; i++) {
       headers.push(`${i}일`);
     }
@@ -212,7 +212,7 @@ export default function AttendanceManagementPage() {
       const row: any = {
         '관원 이름': student.name,
         '수련반': classMap[student.class_id] || '미배정',
-        '등원횟수': attendanceCount
+        '출근횟수': attendanceCount
       };
 
       for (let i = 1; i <= daysInMonth; i++) {
@@ -537,7 +537,7 @@ export default function AttendanceManagementPage() {
               disabled={isProcessing}
               style={{ padding: '12px 24px', backgroundColor: '#10B981', color: '#FFFFFF', borderRadius: '16px', border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', transition: 'all' }}
             >
-              {isProcessing ? '처리 중...' : `선택 회원 등원 처리 (${selectedIds.length})`}
+              {isProcessing ? '처리 중...' : `선택 회원 출근 처리 (${selectedIds.length})`}
             </button>
           )}
 
@@ -551,7 +551,7 @@ export default function AttendanceManagementPage() {
               disabled={isProcessing}
               style={{ padding: '12px 24px', backgroundColor: '#3B82F6', color: '#FFFFFF', borderRadius: '16px', border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)', transition: 'all' }}
             >
-              {isProcessing ? '처리 중...' : `선택 회원 하원 처리 (${selectedIds.length})`}
+              {isProcessing ? '처리 중...' : `선택 회원 퇴근 처리 (${selectedIds.length})`}
             </button>
           )}
 
@@ -644,7 +644,7 @@ export default function AttendanceManagementPage() {
                           backgroundColor: log.type === 'IN' ? '#10B981' : log.type === 'OUT' ? '#3B82F6' : log.type === 'NOT_IN' ? '#EF4444' : '#F59E0B',
                           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                         }}>
-                          {log.type === 'IN' ? '등원' : log.type === 'OUT' ? '하원' : log.type === 'NOT_IN' ? '미출근' : '미퇴근'}
+                          {log.type === 'IN' ? '출근' : log.type === 'OUT' ? '퇴근' : log.type === 'NOT_IN' ? '미출근' : '미퇴근'}
                         </span>
                       </td>
                       <td className="px-6 py-3">

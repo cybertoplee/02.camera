@@ -19,15 +19,15 @@ export default function SettingsPage() {
   const [attendanceRefreshInterval, setAttendanceRefreshInterval] = useState(1);
   const [attendanceAutoCheckoutMinutes, setAttendanceAutoCheckoutMinutes] = useState(10);
   const [smsEnabled, setSmsEnabled] = useState(false);
-  const [smsTemplateIn, setSmsTemplateIn] = useState('[EG태권도] {name} 학생이 {time}에 등원하였습니다.');
-  const [smsTemplateOut, setSmsTemplateOut] = useState('[EG태권도] {name} 학생이 {time}에 하원하였습니다.');
+  const [smsTemplateIn, setSmsTemplateIn] = useState('[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.');
+  const [smsTemplateOut, setSmsTemplateOut] = useState('[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.');
 
   const [initialSettings, setInitialSettings] = useState({
     attendanceRefreshInterval: 1,
     attendanceAutoCheckoutMinutes: 10,
     smsEnabled: false,
-    smsTemplateIn: '[EG태권도] {name} 학생이 {time}에 등원하였습니다.',
-    smsTemplateOut: '[EG태권도] {name} 학생이 {time}에 하원하였습니다.'
+    smsTemplateIn: '[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.',
+    smsTemplateOut: '[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.'
   });
 
   const hasChanges = 
@@ -67,7 +67,7 @@ export default function SettingsPage() {
           setTestStudentId(String(res.rows[0].id));
         }
       } catch (err) {
-        console.error('학생 ID 로드 실패:', err);
+        console.error('회원 ID 로드 실패:', err);
       }
     };
     fetchValidStudentId();
@@ -103,8 +103,8 @@ export default function SettingsPage() {
         attendanceRefreshInterval: refresh ? Number(refresh.value) : 1,
         attendanceAutoCheckoutMinutes: checkout ? Number(checkout.value) : 10,
         smsEnabled: smsOn ? smsOn.value === 'true' : false,
-        smsTemplateIn: tplIn ? tplIn.value : '[EG태권도] {name} 학생이 {time}에 등원하였습니다.',
-        smsTemplateOut: tplOut ? tplOut.value : '[EG태권도] {name} 학생이 {time}에 하원하였습니다.'
+        smsTemplateIn: tplIn ? tplIn.value : '[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.',
+        smsTemplateOut: tplOut ? tplOut.value : '[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.'
       });
     } catch (err: any) {
       console.warn('시스템 설정 로드 중 안내:', err.message);
@@ -132,8 +132,8 @@ export default function SettingsPage() {
           { key: 'attendance_refresh_interval', value: '1' },
           { key: 'attendance_auto_checkout_minutes', value: '10' },
           { key: 'sms_enabled', value: 'false' },
-          { key: 'sms_template_in', value: '[EG태권도] {name} 학생이 {time}에 등원하였습니다.' },
-          { key: 'sms_template_out', value: '[EG태권도] {name} 학생이 {time}에 하원하였습니다.' }
+          { key: 'sms_template_in', value: '[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.' },
+          { key: 'sms_template_out', value: '[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.' }
         ]);
         
         console.log('tkd_system_settings 데이터 초기화 완료');
@@ -157,8 +157,8 @@ export default function SettingsPage() {
             attendanceRefreshInterval: refresh ? Number(refresh.value) : 1,
             attendanceAutoCheckoutMinutes: checkout ? Number(checkout.value) : 10,
             smsEnabled: smsOn ? smsOn.value === 'true' : false,
-            smsTemplateIn: tplIn ? tplIn.value : '[EG태권도] {name} 학생이 {time}에 등원하였습니다.',
-            smsTemplateOut: tplOut ? tplOut.value : '[EG태권도] {name} 학생이 {time}에 하원하였습니다.'
+            smsTemplateIn: tplIn ? tplIn.value : '[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.',
+            smsTemplateOut: tplOut ? tplOut.value : '[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.'
           });
         }
       } catch (finalErr) {
@@ -205,6 +205,10 @@ export default function SettingsPage() {
     try {
       // 1. 시스템 설정 저장 (tkd_system_settings)
       try {
+        // 기존 설정 항목 삭제 (중복 생성 방지)
+        for (const key of ['attendance_refresh_interval', 'attendance_auto_checkout_minutes', 'sms_enabled', 'sms_template_in', 'sms_template_out']) {
+          await deleteRows('tkd_system_settings', { filters: { key } });
+        }
         await insertRows('tkd_system_settings', [
           { key: 'attendance_refresh_interval', value: String(attendanceRefreshInterval) },
           { key: 'attendance_auto_checkout_minutes', value: String(attendanceAutoCheckoutMinutes) },
@@ -236,7 +240,7 @@ export default function SettingsPage() {
 
   const handleTestSMS = async () => {
     if (!testStudentId) {
-      alert('테스트할 학생 ID를 입력해주세요.');
+      alert('테스트할 회원 ID를 입력해주세요.');
       return;
     }
 
@@ -439,15 +443,23 @@ export default function SettingsPage() {
             <div className="flex items-center gap-6">
               <button
                 onClick={async () => {
-                  if (confirm('새 창이 열립니다. (작업 표시줄에서 확인 하세요). 로그인을 완료해 주세요.')) {
+                  // Open Google Messages pairing page in a new window
+                  const pairingWindow = window.open('https://messages.google.com/web', '_blank', 'width=800,height=600');
+                  const confirmMsg = '현재 Google 메시지 웹 연동 모드입니다. 기기 연동이 완료된 경우, 실제 문자가 연동된 휴대폰을 통해 발송됩니다. 연동이 해제된 경우 발송에 실패할 수 있으니 주의해 주세요.\n\n새 창을 열어 기기를 연동하시겠습니까?';
+                  if (confirm(confirmMsg)) {
                     setStatus('기기 연동 대기 중...');
                     try {
                       const res = await apiFetch('/api/sms/setup');
                       const data = await res.json();
                       
                       if (res.ok) {
-                        alert('기기 연동이 완료되었습니다.');
-                        setStatus('연동 완료');
+                        alert('기기 연동이 성공적으로 완료되었습니다.\n이제 자동 문자 발송 기능이 정상적으로 동작합니다.');
+                        setStatus('✅ 기기 연동 완료 (문자 발송 활성화 됨)');
+                        
+                        // 기기 연동 성공 시, SMS 설정을 즉시 활성화 상태로 변경 (환경 세팅)
+                        setSmsEnabled(true);
+                        setInitialSettings(prev => ({ ...prev, smsEnabled: true }));
+                        await handleSave();
                       } else {
                         const errorMsg = data.error || '연동에 실패하였습니다.';
                         alert(`연동 실패: ${errorMsg}`);
@@ -472,7 +484,20 @@ export default function SettingsPage() {
               
               <div 
                 className="flex items-center gap-3 cursor-pointer" 
-                onClick={() => setSmsEnabled(!smsEnabled)}
+                onClick={async () => {
+                  const newVal = !smsEnabled;
+                  setSmsEnabled(newVal);
+                  // 스위치 조작 즉시 DB에 반영 (수동 저장 클릭 없이 테스트 문자가 정상 작동하도록)
+                  try {
+                    await deleteRows('tkd_system_settings', { filters: { key: 'sms_enabled' } });
+                    await insertRows('tkd_system_settings', [
+                      { key: 'sms_enabled', value: String(newVal) }
+                    ]);
+                    setInitialSettings(prev => ({ ...prev, smsEnabled: newVal }));
+                  } catch (e) {
+                    console.error('스위치 상태 자동 저장 실패:', e);
+                  }
+                }}
               >
                 {/* 100% 안전한 인라인 스타일 토글 스위치 */}
                 <div 
@@ -524,7 +549,7 @@ export default function SettingsPage() {
                   value={smsTemplateIn}
                   onChange={(e) => setSmsTemplateIn(e.target.value)}
                   className="w-full bg-slate-50 border-2 border-slate-200 rounded-[24px] p-6 font-bold text-slate-700 h-32 focus:border-blue-500 focus:bg-white outline-none transition-all resize-none"
-                  placeholder="등원 시 발송될 메시지 내용을 입력하세요."
+                  placeholder="출근 시 발송될 메시지 내용을 입력하세요."
                 />
               </div>
 
@@ -537,7 +562,7 @@ export default function SettingsPage() {
                   value={smsTemplateOut}
                   onChange={(e) => setSmsTemplateOut(e.target.value)}
                   className="w-full bg-slate-50 border-2 border-slate-200 rounded-[24px] p-6 font-bold text-slate-700 h-32 focus:border-blue-500 focus:bg-white outline-none transition-all resize-none"
-                  placeholder="하원 시 발송될 메시지 내용을 입력하세요."
+                  placeholder="퇴근 시 발송될 메시지 내용을 입력하세요."
                 />
               </div>
             </div>
@@ -565,7 +590,7 @@ export default function SettingsPage() {
                   className="flex items-center gap-3 bg-white px-4 rounded-[16px] border-2 border-slate-200 shadow-sm box-border"
                   style={{ height: '44px' }}
                 >
-                  <span className="text-sm font-bold text-slate-500">학생 ID:</span>
+                  <span className="text-sm font-bold text-slate-500">회원 ID:</span>
                   <input
                     type="number"
                     value={testStudentId}
@@ -617,21 +642,19 @@ export default function SettingsPage() {
               </>
             )}
           </p>
-          {hasChanges && (
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              style={{ 
-                padding: '26px 40px',
-                backgroundColor: isSaving ? '#e2e8f0' : '#2563eb', 
-                color: isSaving ? '#94a3b8' : '#ffffff',
-                boxShadow: isSaving ? 'none' : '0 12px 24px -8px rgba(37,99,235,0.4)'
-              }}
-              className="rounded-[24px] font-black text-lg transition-all active:scale-95 w-full md:w-auto border-none cursor-pointer"
-            >
-              {isSaving ? '처리 중...' : '설정 안전하게 저장'}
-            </button>
-          )}
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{ 
+              padding: '26px 40px',
+              backgroundColor: isSaving ? '#e2e8f0' : (hasChanges ? '#2563eb' : '#0ea5e9'), 
+              color: isSaving ? '#94a3b8' : '#ffffff',
+              boxShadow: isSaving ? 'none' : (hasChanges ? '0 12px 24px -8px rgba(37,99,235,0.4)' : '0 12px 24px -8px rgba(14,165,233,0.3)')
+            }}
+            className="rounded-[24px] font-black text-lg transition-all active:scale-95 w-full md:w-auto border-none cursor-pointer"
+          >
+            {isSaving ? '처리 중...' : (hasChanges ? '설정 안전하게 저장' : '현재 설정 다시 저장')}
+          </button>
         </div>
       </main>
     </div>

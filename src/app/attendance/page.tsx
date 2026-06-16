@@ -166,9 +166,9 @@ export default function AttendanceMonitorPage() {
         setTodayCount(data.count || 0);
 
         if (data.logs && data.students) {
-          const studentMap = new Map(data.students.map((s: any) => [s.id, s.name]));
+          const studentMap = new Map(data.students.map((s: any) => [String(s.id), s.name]));
           const formattedLogs = data.logs.map((l: any) => ({
-            name: studentMap.get(l.student_id) || `ID: ${l.student_id}`,
+            name: studentMap.has(String(l.student_id)) ? `ID: ${l.student_id} ${studentMap.get(String(l.student_id))}` : `ID: ${l.student_id}`,
             time: new Date(l.timestamp).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
             type: l.type as 'IN' | 'OUT'
           }));
@@ -405,7 +405,7 @@ export default function AttendanceMonitorPage() {
           determinedType = 'DUPLICATE';
         }
       } else {
-        // 신규 등원 처리
+        // 신규 출근 처리
         determinedType = 'IN';
         const localISO = new Date(now - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
         await insertRows('attendance_logs', [{
@@ -431,7 +431,7 @@ export default function AttendanceMonitorPage() {
     // UI 업데이트: 다중 팝업 지원 (팝업은 중복인 경우에도 알림을 위해 표시)
     setMatchedStudents((prev) => [...prev, { student, type: determinedType }]);
     
-    // 최근 기록 업데이트 (실제 등원/하원인 경우에만 추가)
+    // 최근 기록 업데이트 (실제 출근/퇴근인 경우에만 추가)
     if (determinedType !== 'DUPLICATE') {
       setRecentLogs((prev) => [
         { 
@@ -442,7 +442,7 @@ export default function AttendanceMonitorPage() {
         ...prev.slice(0, 4)
       ]);
 
-      // 오늘 등원 수 증가 (신규 등원인 경우에만)
+      // 오늘 출근 수 증가 (신규 출근인 경우에만)
       if (determinedType === 'IN') {
         setTodayCount((prev) => prev + 1);
       }
@@ -611,7 +611,7 @@ export default function AttendanceMonitorPage() {
               <span className="w-2 h-2 md:w-2.5 md:h-2.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
             </div>
             <div className="flex items-baseline gap-3 md:gap-5 mb-[-2px] md:mb-[-5px]">
-              <h2 className="text-sm md:text-xl font-black text-white uppercase tracking-[0.2em] leading-none pb-2 md:pb-3 m-0">오늘 등원</h2>
+              <h2 className="text-sm md:text-xl font-black text-white uppercase tracking-[0.2em] leading-none pb-2 md:pb-3 m-0">오늘 출근</h2>
               <span className="text-5xl md:text-8xl font-black text-white leading-none tracking-tighter">{todayCount}</span>
             </div>
           </div>
@@ -676,8 +676,8 @@ export default function AttendanceMonitorPage() {
                       {type === 'DUPLICATE' 
                         ? '이미 오늘 출결 처리가 완료되었습니다.' 
                         : type === 'OUT' 
-                          ? '정상적으로 하원 처리되었습니다!' 
-                          : '정상적으로 등원 처리되었습니다!'}
+                          ? '정상적으로 퇴근 처리되었습니다!' 
+                          : '정상적으로 출근 처리되었습니다!'}
                     </div>
 
                     {(type === 'IN' || type === 'OUT') && (

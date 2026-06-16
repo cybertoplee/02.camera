@@ -212,8 +212,8 @@ export default function ClientAttendanceLogs({ initialLogs, allStudents, error }
               const notOutCount = inIds.size - outIds.size;
               return [
                 { id: 'ALL', label: '전체', count: initialLogs.length + (filter === 'ALL' ? 0 : processedIds.size) },
-                { id: 'NOT_IN', label: '미등원', count: notInCount > 0 ? notInCount : 0 },
-                { id: 'NOT_OUT', label: '미하원', count: notOutCount > 0 ? notOutCount : 0 }
+                { id: 'NOT_IN', label: '미출근', count: notInCount > 0 ? notInCount : 0 },
+                { id: 'NOT_OUT', label: '미퇴근', count: notOutCount > 0 ? notOutCount : 0 }
               ].map((tab) => (
                 <button key={tab.id} onClick={() => setFilter(tab.id as any)} className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${filter === tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
                   <span>{tab.label}</span>
@@ -292,7 +292,7 @@ export default function ClientAttendanceLogs({ initialLogs, allStudents, error }
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-black text-slate-900 text-lg">{log.student_name}</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-lg">{log.class_name || '일반'}</span>
-                    {!isManualTab && <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${log.type === 'IN' ? 'bg-blue-600 text-white' : 'bg-rose-500 text-white'}`}>{log.type === 'IN' ? '등원' : '하원'}</span>}
+                    {!isManualTab && <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${log.type === 'IN' ? 'bg-blue-600 text-white' : 'bg-rose-500 text-white'}`}>{log.type === 'IN' ? '출근' : '퇴근'}</span>}
                   </div>
                   <div className="flex items-center justify-between">
                     {log.parent_phone && (
@@ -334,7 +334,7 @@ export default function ClientAttendanceLogs({ initialLogs, allStudents, error }
           </label>
           <button onClick={handleAttendanceProcess} disabled={isProcessing} className="w-full bg-slate-900 text-white py-4 rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
             {isProcessing ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
-            <span className="font-black text-lg">{selectedIds.length}명 {filter === 'NOT_IN' ? '등원' : '하원'}처리</span>
+            <span className="font-black text-lg">{selectedIds.length}명 {filter === 'NOT_IN' ? '출근' : '퇴근'}처리</span>
           </button>
         </div>
       )}

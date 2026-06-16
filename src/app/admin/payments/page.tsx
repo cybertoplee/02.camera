@@ -102,7 +102,7 @@ export default function PaymentManagementPage() {
       
       const studentsList = studentsRes.rows || [];
       setStudents(studentsList);
-      const studentMap = new Map(studentsList.map((s: any) => [s.id, s]));
+      const studentMap = new Map(studentsList.map((s: any) => [String(s.id), s]));
 
       const paymentsRes = await queryTableAction('payment_records', {
         orderBy: 'payment_date',
@@ -111,7 +111,7 @@ export default function PaymentManagementPage() {
       if (!paymentsRes.success) throw new Error(paymentsRes.error);
 
       const payments = (paymentsRes.rows || []).map((p: any) => {
-        const student = studentMap.get(p.student_id);
+        const student = studentMap.get(String(p.student_id));
         return {
           ...p,
           student_name: student?.name || null,

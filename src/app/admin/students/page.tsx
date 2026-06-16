@@ -670,12 +670,12 @@ export default function StudentManagementPage() {
                         <div className="flex flex-col gap-1.5 ml-3 border-l border-slate-100 pl-3">
                           {student.receive_sms_in === 'true' && (
                             <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', padding: '2px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', display: 'inline-block', textAlign: 'center' }}>
-                              등원 알림
+                              출근알림
                             </span>
                           )}
                           {student.receive_sms_out === 'true' && (
                             <span style={{ backgroundColor: '#FFF7ED', color: '#EA580C', border: '1px solid #FED7AA', padding: '2px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', display: 'inline-block', textAlign: 'center' }}>
-                              하원 알림
+                              퇴근알림
                             </span>
                           )}
                         </div>
@@ -897,7 +897,7 @@ export default function StudentManagementPage() {
                             onChange={(e) => setEditFormData({...editFormData, receive_sms_in: e.target.checked})}
                             className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
                           />
-                          <span className="font-bold text-slate-700 text-sm whitespace-nowrap">등원 받기</span>
+                          <span className="font-bold text-slate-700 text-sm whitespace-nowrap">출근 받기</span>
                         </label>
                         <label className={`flex-1 flex items-center justify-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 transition-all shadow-sm h-[56px] box-border ${canEnableSms ? 'hover:bg-slate-100 cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
                           <input
@@ -907,18 +907,18 @@ export default function StudentManagementPage() {
                             onChange={(e) => setEditFormData({...editFormData, receive_sms_out: e.target.checked})}
                             className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
                           />
-                          <span className="font-bold text-slate-700 text-sm whitespace-nowrap">하원 받기</span>
+                          <span className="font-bold text-slate-700 text-sm whitespace-nowrap">퇴근 받기</span>
                         </label>
                       </div>
                     </div>
                   );
                 })()}
                 <div className="flex flex-col gap-2 group">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">급/단</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">직책/직급</label>
                   <input type="text" value={editFormData.rank} onChange={(e) => setEditFormData({...editFormData, rank: e.target.value})} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all" />
                 </div>
                 <div className="flex flex-col gap-2 group">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">반 선택</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">소속</label>
                   <select value={editFormData.class_id} onChange={(e) => setEditFormData({...editFormData, class_id: e.target.value})} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-bold text-slate-900 focus:border-blue-500 focus:bg-white outline-none transition-all appearance-none cursor-pointer">
                     {classes.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
                   </select>

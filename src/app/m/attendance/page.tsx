@@ -31,7 +31,7 @@ export default async function MobileAttendancePage({ searchParams }: { searchPar
       ...s,
       class_name: cmap[s.class_id] || ''
     }));
-    const studentMap = new Map<number, any>(allStudents.map((s: any) => [s.id, s]));
+    const studentMap = new Map<string, any>(allStudents.map((s: any) => [String(s.id), s]));
 
     const today = new Date();
     const tzOffset = 9 * 60 * 60000; // Korea
@@ -54,10 +54,10 @@ export default async function MobileAttendancePage({ searchParams }: { searchPar
     const logs = logsRes?.rows || [];
     
     formattedLogs = logs.map((log: any) => {
-      const student = studentMap.get(log.student_id);
+      const student = studentMap.get(String(log.student_id));
       return {
         ...log,
-        student_name: student?.name || `ID: ${log.student_id}`,
+        student_name: student ? `ID: ${log.student_id} ${student.name}` : `ID: ${log.student_id}`,
         class_name: student?.class_name || '',
         parent_phone: student?.parent_phone || '',
         profile_image: student?.profile_image || null

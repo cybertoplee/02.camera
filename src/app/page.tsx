@@ -106,7 +106,7 @@ export default function HomePage() {
                   AI 출결관리 시스템
                 </h3>
                 <p className="text-slate-400 text-sm mt-2 font-medium">
-                  고성능 안면 인식 알고리즘을 통한 관원 자동 등하원 체크, 등하원 시 안심 SMS 알림 전송 기능 제공.
+                  고성능 안면 인식 알고리즘을 통한 관원 자동 등퇴근 체크, 등퇴근 시 안심 SMS 알림 전송 기능 제공.
                 </p>
               </div>
               <div className="mt-auto pt-4 flex items-center text-xs font-black tracking-widest text-emerald-400 uppercase gap-1">
@@ -126,7 +126,7 @@ export default function HomePage() {
                   전체 회원 및 출결 관리
                 </h4>
                 <p className="text-slate-500 text-xs mt-1">
-                  관원 리스트 조회, 반 배정, 등하원 상태 기록 관리 및 SMS 템플릿 설정.
+                  관원 리스트 조회, 반 배정, 등퇴근 상태 기록 관리 및 SMS 템플릿 설정.
                 </p>
               </div>
             </div>

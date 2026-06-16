@@ -153,7 +153,7 @@ export default function ClientStudents({ initialStudents, error }: { initialStud
 
               {student.last_attendance && (
                 <div className="absolute top-4 right-4 text-[10px] font-bold text-slate-300">
-                  최근 등원 {student.last_attendance.split('T')[0].substring(5)}
+                  최근 출근 {student.last_attendance.split('T')[0].substring(5)}
                 </div>
               )}
             </div>

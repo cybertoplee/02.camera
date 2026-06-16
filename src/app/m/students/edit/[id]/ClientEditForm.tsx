@@ -232,13 +232,13 @@ export default function ClientEditForm({ student, classes, customFields, error }
                   <input type="checkbox" checked={smsIn} onChange={e => setSmsIn(e.target.checked)} className="hidden" />
                   <input type="hidden" name="receive_sms_in" value={smsIn ? 'true' : 'false'} />
                   {smsIn ? <CheckCircle2 size={18} className="text-blue-600" /> : <div className="w-[18px] h-[18px] rounded-full border-2 border-slate-300" />}
-                  <span className={`text-sm font-bold ${smsIn ? 'text-blue-700' : 'text-slate-500'}`}>등원 알림</span>
+                  <span className={`text-sm font-bold ${smsIn ? 'text-blue-700' : 'text-slate-500'}`}>출근알림</span>
                 </label>
                 <label className={`flex-1 flex items-center justify-center gap-2 p-3.5 rounded-2xl border transition-all cursor-pointer ${smsOut ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
                   <input type="checkbox" checked={smsOut} onChange={e => setSmsOut(e.target.checked)} className="hidden" />
                   <input type="hidden" name="receive_sms_out" value={smsOut ? 'true' : 'false'} />
                   {smsOut ? <CheckCircle2 size={18} className="text-blue-600" /> : <div className="w-[18px] h-[18px] rounded-full border-2 border-slate-300" />}
-                  <span className={`text-sm font-bold ${smsOut ? 'text-blue-700' : 'text-slate-500'}`}>하원 알림</span>
+                  <span className={`text-sm font-bold ${smsOut ? 'text-blue-700' : 'text-slate-500'}`}>퇴근알림</span>
                 </label>
               </div>
             </div>

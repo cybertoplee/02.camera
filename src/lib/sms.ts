@@ -44,11 +44,11 @@ export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
     const isEnabled = smsEnabledEntry?.value === 'true' || smsEnabledEntry?.value === 'ON';
     if (!isEnabled) {
       logToFile(`[중단] SMS 발송 설정이 꺼져 있습니다. (현재값: ${smsEnabledEntry?.value})`);
-      return { success: false, error: 'SMS 발송 설정이 비활성화 상태입니다.' };
+      return { success: false, error: 'SMS 발송 설정이 비활성화 상태입니다. 우측의 스위치를 켜고 [설정 저장] 후 다시 테스트해 주세요.' };
     }
 
-    const templateIn = settings.find((s: any) => s.key === 'sms_template_in')?.value || '[EG태권도] {name} 학생이 {time}에 등원하였습니다.';
-    const templateOut = settings.find((s: any) => s.key === 'sms_template_out')?.value || '[EG태권도] {name} 학생이 {time}에 하원하였습니다.';
+    const templateIn = settings.find((s: any) => s.key === 'sms_template_in')?.value || '[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.';
+    const templateOut = settings.find((s: any) => s.key === 'sms_template_out')?.value || '[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.';
     
     // 2. 학생 및 학부모 정보 가져오기
     const studentRes = await executeSQL(`SELECT name, parent_phone, parent_name FROM students WHERE id = ${studentId}`);
@@ -157,8 +157,8 @@ export async function sendAttendanceSMSBatch(requests: { studentId: number, type
       return { success: false, error: 'SMS disabled' };
     }
 
-    const templateIn = settings.find((s: any) => s.key === 'sms_template_in')?.value || '[EG태권도] {name} 학생이 {time}에 등원하였습니다.';
-    const templateOut = settings.find((s: any) => s.key === 'sms_template_out')?.value || '[EG태권도] {name} 학생이 {time}에 하원하였습니다.';
+    const templateIn = settings.find((s: any) => s.key === 'sms_template_in')?.value || '[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.';
+    const templateOut = settings.find((s: any) => s.key === 'sms_template_out')?.value || '[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.';
 
     // 브라우저 1회 초기화
     await gmAutomation.init(true);

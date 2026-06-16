@@ -123,8 +123,8 @@ export async function setupDatabase() {
         { key: 'attendance_refresh_interval', value: '1' },
         { key: 'attendance_auto_checkout_minutes', value: '10' },
         { key: 'sms_enabled', value: 'false' },
-        { key: 'sms_template_in', value: '[EG태권도] {name} 학생이 {time}에 등원하였습니다.' },
-        { key: 'sms_template_out', value: '[EG태권도] {name} 학생이 {time}에 하원하였습니다.' }
+        { key: 'sms_template_in', value: '[EGDesk 플랫폼] {name} 회원이 {time}에 출근하였습니다.' },
+        { key: 'sms_template_out', value: '[EGDesk 플랫폼] {name} 회원이 {time}에 퇴근하였습니다.' }
       ]);
     }
     console.log('Table "tkd_system_settings" created and initialized.');

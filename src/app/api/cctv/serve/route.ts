@@ -35,9 +35,24 @@ export async function GET(request: Request) {
       const file = fs.createReadStream(filePath, {start, end});
       const stream = new ReadableStream({
         start(controller) {
-          file.on('data', (chunk) => controller.enqueue(chunk));
-          file.on('end', () => controller.close());
-          file.on('error', (err) => controller.error(err));
+          let closed = false;
+          file.on('data', (chunk) => {
+            if (closed) return;
+            try { controller.enqueue(chunk); } catch (e) { closed = true; file.destroy(); }
+          });
+          file.on('end', () => {
+            if (closed) return;
+            closed = true;
+            try { controller.close(); } catch (e) {}
+          });
+          file.on('error', (err) => {
+            if (closed) return;
+            closed = true;
+            try { controller.error(err); } catch (e) {}
+          });
+        },
+        cancel() {
+          file.destroy();
         }
       });
 
@@ -54,9 +69,24 @@ export async function GET(request: Request) {
       const file = fs.createReadStream(filePath);
       const stream = new ReadableStream({
         start(controller) {
-          file.on('data', (chunk) => controller.enqueue(chunk));
-          file.on('end', () => controller.close());
-          file.on('error', (err) => controller.error(err));
+          let closed = false;
+          file.on('data', (chunk) => {
+            if (closed) return;
+            try { controller.enqueue(chunk); } catch (e) { closed = true; file.destroy(); }
+          });
+          file.on('end', () => {
+            if (closed) return;
+            closed = true;
+            try { controller.close(); } catch (e) {}
+          });
+          file.on('error', (err) => {
+            if (closed) return;
+            closed = true;
+            try { controller.error(err); } catch (e) {}
+          });
+        },
+        cancel() {
+          file.destroy();
         }
       });
       return new NextResponse(stream, {

@@ -20,7 +20,7 @@ export default function TestSMSPage() {
     <div className="p-10 font-sans">
       <h1 className="text-2xl font-black mb-6">SMS 발송 테스트</h1>
       <div className="flex gap-4 items-center mb-6">
-        <label className="font-bold">학생 ID:</label>
+        <label className="font-bold">회원 ID:</label>
         <input 
           type="number" 
           value={studentId} 

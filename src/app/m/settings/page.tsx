@@ -78,6 +78,9 @@ export default function MobileSettingsPage() {
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
+      for (const key of ['attendance_refresh_interval', 'attendance_auto_checkout_minutes']) {
+        await deleteRows('tkd_system_settings', { filters: { key } });
+      }
       await insertRows('tkd_system_settings', [
         { key: 'attendance_refresh_interval', value: String(refreshInterval) },
         { key: 'attendance_auto_checkout_minutes', value: String(autoCheckoutMinutes) }
@@ -219,8 +222,8 @@ export default function MobileSettingsPage() {
                   <Clock size={20} />
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-800">자동 하원 시간</div>
-                  <div className="text-[10px] text-slate-400">인식 후 하원 처리 시간</div>
+                  <div className="font-semibold text-slate-800">자동 퇴근 시간</div>
+                  <div className="text-[10px] text-slate-400">인식 후 퇴근 처리 시간</div>
                 </div>
               </div>
               <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
