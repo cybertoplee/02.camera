@@ -36,6 +36,9 @@ export class GoogleMessagesAutomation {
       }
     }
 
+    // 신규 브라우저 실행 전에 기존 락 프로세스가 있는지 확인하고 정리
+    this.killExistingProcesses();
+
     // 저장소 디렉토리 생성
     const storageDir = path.dirname(STORAGE_PATH);
     if (!fs.existsSync(storageDir)) {
@@ -225,10 +228,19 @@ export class GoogleMessagesAutomation {
       
       console.log(`[GoogleMessages] 메시지 발송 시작: ${phoneNumber}`);
 
-      // 0. 연동 상태(QR 화면 등)인지 먼저 확인
+      // 0. 연동 상태 혹은 로그인 완료 상태 확인 (최대 15초 대기)
       try {
-        const qrCode = await this.page!.waitForSelector('mw-qr-code, [data-e2e="qr-code"], button:has-text("기기 페어링"), a:has-text("기기 페어링")', { timeout: 2000 }).catch(() => null);
-        if (qrCode) {
+        const loggedInSelector = 'input[placeholder*="시작"], input[placeholder*="Start"], button:has-text("시작"), button:has-text("Start chat"), [aria-label*="시작"], [aria-label*="Start chat"], .conversation-list, [role="grid"]';
+        const qrSelector = 'mw-qr-code, [data-e2e="qr-code"], button:has-text("기기 페어링"), a:has-text("기기 페어링")';
+        
+        const detected = await Promise.race([
+          this.page!.waitForSelector(loggedInSelector, { state: 'visible', timeout: 15000 }).then(() => 'logged_in'),
+          this.page!.waitForSelector(qrSelector, { state: 'visible', timeout: 15000 }).then(() => 'qr_code')
+        ]).catch(() => 'timeout');
+
+        console.log(`[GoogleMessages] 연동 상태 감지 결과: ${detected}`);
+
+        if (detected === 'qr_code' || detected === 'timeout') {
           throw new Error('기기 연동이 해제되었습니다. [기기 연동하기] 버튼을 눌러 다시 연결해 주세요.');
         }
       } catch (e: any) {
@@ -300,6 +312,29 @@ export class GoogleMessagesAutomation {
         await this.close();
       }
       return { success: false, error: err.message || err };
+    }
+  }
+
+  private killExistingProcesses() {
+    if (process.platform !== 'win32') return;
+    try {
+      const { execSync } = require('child_process');
+      const output = execSync('wmic process where "name=\'chrome.exe\'" get processid,commandline', { encoding: 'utf8' });
+      const lines = output.split('\n');
+      for (const line of lines) {
+        if (line.includes('playwright-profile')) {
+          const match = line.trim().match(/(\d+)\s*$/);
+          if (match) {
+            const pid = match[1];
+            console.log(`[GoogleMessages] 기존 실행 중인 locked 프로세스 종료: PID ${pid}`);
+            try {
+              execSync(`taskkill /F /PID ${pid}`);
+            } catch (err) {}
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors if wmic fails or no matching process found
     }
   }
 

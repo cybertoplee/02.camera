@@ -443,9 +443,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-6">
               <button
                 onClick={async () => {
-                  // Open Google Messages pairing page in a new window
-                  const pairingWindow = window.open('https://messages.google.com/web', '_blank', 'width=800,height=600');
-                  const confirmMsg = '현재 Google 메시지 웹 연동 모드입니다. 기기 연동이 완료된 경우, 실제 문자가 연동된 휴대폰을 통해 발송됩니다. 연동이 해제된 경우 발송에 실패할 수 있으니 주의해 주세요.\n\n새 창을 열어 기기를 연동하시겠습니까?';
+                  const confirmMsg = 'Google 메시지 기기 연동을 시작하시겠습니까?\n\n[확인]을 누르면 QR 코드가 표시된 크롬(Chrome) 창이 실행됩니다.\n휴대폰의 구글 메시지 앱에서 QR 코드를 스캔하여 페어링을 완료해 주세요.';
                   if (confirm(confirmMsg)) {
                     setStatus('기기 연동 대기 중...');
                     try {

@@ -46,3 +46,9 @@ scratch/
 *.db
 
 certificates
+
+# media and temporary files
+*.jpg
+*.webm
+*.png
+/CCTV/
