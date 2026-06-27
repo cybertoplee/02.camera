@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, ClipboardEdit, Camera, Home } from 'lucide-react';
-import { insertRows, queryTable, executeSQL } from '@root/egdesk-helpers';
+import { useRouter, usePathname } from 'next/navigation';
+import { ArrowLeft, ClipboardEdit, Camera, Home, TriangleAlert } from 'lucide-react';
+import { insertRows, queryTable, executeSQL, getEgdeskBasePath } from '@root/egdesk-helpers';
 import { sendAttendanceSMSAction } from '@/app/actions/sms';
 interface CustomField {
   id: number;
@@ -15,6 +15,9 @@ interface CustomField {
 import { useCamera } from '@/lib/useCamera';
 
 export default function StudentRegisterPage() {
+  const router = useRouter();
+  const pathname = usePathname() || '';
+  const isMobile = pathname.startsWith('/m');
   const [formData, setFormData] = useState<any>({
     name: '',
     parentName: '',
@@ -32,7 +35,7 @@ export default function StudentRegisterPage() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [status, setStatus] = useState('AI 모델 로딩 중...');
-  const { stream, error: camError, start, stop, toggle } = useCamera();
+  const { stream, error: camError, start, stop, toggle, clearError } = useCamera();
   const isCameraOn = !!stream;
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -41,6 +44,15 @@ export default function StudentRegisterPage() {
   const [mounted, setMounted] = useState(false);
   const isPageMounted = useRef(true);
   const faceapiRef = useRef<any>(null);
+
+  // Refs for tracking registration state and form data without restarting effects
+  const isRegisteringRef = useRef(false);
+  const formDataRef = useRef(formData);
+  const [flashActive, setFlashActive] = useState(false);
+
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -59,7 +71,8 @@ const initDatabase = async () => {
       try {
         const faceapi = await import('@vladmandic/face-api');
         faceapiRef.current = faceapi;
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
+        const basePath = getEgdeskBasePath();
+        const MODEL_URL = `${basePath}/models/`;
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -96,7 +109,7 @@ const initDatabase = async () => {
       const res = await queryTable('student_classes');
       if (res.rows && res.rows.length > 0) {
         setClasses(res.rows);
-        setFormData(prev => ({ ...prev, classId: String(res.rows[0].id) }));
+        setFormData((prev: any) => ({ ...prev, classId: String(res.rows[0].id) }));
       }
     } catch (err) {
       console.error('반 로드 실패:', err);
@@ -125,6 +138,7 @@ const fetchCustomFields = async () => {
       stop();
       setStatus('');
       setIsFaceDetected(false);
+      isRegisteringRef.current = false;
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) {
@@ -133,9 +147,10 @@ const fetchCustomFields = async () => {
       }
     } else {
       if (!formData.name) {
-        alert('학생 이름을 입력해주세요.');
+        alert('회원 이름을 입력해주세요.');
         return;
       }
+      isRegisteringRef.current = false;
       setStatus('카메라 켜는 중...');
       try {
         await start();
@@ -159,19 +174,20 @@ const fetchCustomFields = async () => {
     let isActive = true;
 
     const trackFace = async () => {
-      if (!isModelLoaded || !videoRef.current || !canvasRef.current || isCapturing) {
-        if (isActive) timeoutId = setTimeout(trackFace, 30);
+      if (!isModelLoaded || !videoRef.current || !canvasRef.current || isCapturing || isRegisteringRef.current) {
+        if (isActive) timeoutId = setTimeout(trackFace, 50);
         return;
       }
       
       if (!videoRef.current || videoRef.current.readyState < 2 || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
-        if (isActive) timeoutId = setTimeout(trackFace, 30);
+        if (isActive) timeoutId = setTimeout(trackFace, 50);
         return;
       }
 
       try {
         const faceapi = faceapiRef.current || await import('@vladmandic/face-api');
-        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.3 }));
+        // Use 224 input size to easily capture moving faces with high accuracy
+        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.35 }));
         
         const canvas = canvasRef.current;
         if (canvas.width !== videoRef.current.videoWidth) {
@@ -187,29 +203,73 @@ const fetchCustomFields = async () => {
             setIsFaceDetected(true);
             const { x, y, width, height } = detection.box;
             
-            ctx.strokeStyle = '#3B82F6';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.roundRect(x, y, width, height, 16);
-            ctx.stroke();
+            // Expand drawn box size by 20% (10% padding on each side)
+            const padW = width * 0.10;
+            const padH = height * 0.10;
+            const drawX = x - padW;
+            const drawY = y - padH;
+            const drawWidth = width + padW * 2;
+            const drawHeight = height + padH * 2;
             
-            ctx.fillStyle = '#3B82F6';
+            // Draw a glowing green box when lock-on (score >= 0.45) for auto-capture
+            const isStrong = detection.score >= 0.45;
+            ctx.strokeStyle = isStrong ? '#10B981' : '#3B82F6';
+            ctx.lineWidth = 4;
+            if (isStrong) {
+              ctx.shadowColor = '#10B981';
+              ctx.shadowBlur = 15;
+            }
+            ctx.beginPath();
+            ctx.roundRect(drawX, drawY, drawWidth, drawHeight, 16);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = isStrong ? '#10B981' : '#3B82F6';
             ctx.font = 'bold 24px sans-serif';
             ctx.save();
             // Flip text back because canvas is flipped horizontally
-            ctx.translate(x + width / 2, y - 10);
+            ctx.translate(drawX + drawWidth / 2, drawY - 10);
             ctx.scale(-1, 1);
             ctx.textAlign = 'center';
-            ctx.fillText('FACE DETECTED', 0, 0);
+            ctx.fillText(isStrong ? 'LOCK ON - REGISTERING' : 'FACE DETECTED', 0, 0);
             ctx.restore();
+
+            // Trigger auto capture if name is entered
+            if (isStrong && !isRegisteringRef.current && isCameraOn) {
+              const currentName = formDataRef.current.name;
+              if (currentName) {
+                isRegisteringRef.current = true;
+                setIsCapturing(true);
+                
+                // Camera shutter flash effect
+                setFlashActive(true);
+                setTimeout(() => setFlashActive(false), 300);
+
+                setStatus('얼굴 특징 벡터 분석 중...');
+                const fullDetection = await faceapi
+                  .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.35 }))
+                  .withFaceLandmarks()
+                  .withFaceDescriptor();
+
+                if (fullDetection) {
+                  await handleRegister(fullDetection);
+                } else {
+                  isRegisteringRef.current = false;
+                  setIsCapturing(false);
+                  setStatus('벡터 추출 실패. 움직임을 최소화하고 다시 시도하세요.');
+                }
+              }
+            }
           } else {
             setIsFaceDetected(false);
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error('Face tracking error:', err);
+      }
 
       if (isActive) {
-        timeoutId = setTimeout(trackFace, 30);
+        timeoutId = setTimeout(trackFace, 50);
       }
     };
 
@@ -223,12 +283,12 @@ const fetchCustomFields = async () => {
     };
   }, [isModelLoaded, isCapturing]);
 
-  const handleRegister = async () => {
+  const handleRegister = async (preDetectedFace?: any) => {
     if (!formData.name) {
-      alert('학생 이름을 입력해주세요.');
-      // 이전 입력 상태로 이동 (카메라 끄기 및 입력 폼 표시)
+      alert('회원 이름을 입력해주세요.');
       stop();
       setIsFaceDetected(false);
+      isRegisteringRef.current = false;
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -238,6 +298,7 @@ const fetchCustomFields = async () => {
 
     if (!videoRef.current || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
       setStatus('카메라 화면이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      isRegisteringRef.current = false;
       return;
     }
 
@@ -247,6 +308,7 @@ const fetchCustomFields = async () => {
     try {
       const faceapi = faceapiRef.current || await import('@vladmandic/face-api');
       
+      // Capture snapshot for profile image
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
@@ -259,20 +321,23 @@ const fetchCustomFields = async () => {
         ctx.drawImage(videoRef.current, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
       }
 
-      const detections = await faceapi
-        .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.3 }))
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+      let detections = (preDetectedFace && preDetectedFace.descriptor) ? preDetectedFace : null;
+      if (!detections) {
+        detections = await faceapi
+          .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      }
 
       if (!detections) {
         setStatus('얼굴을 인식하지 못했습니다. 다시 시도해주세요.');
         setIsCapturing(false);
+        isRegisteringRef.current = false;
         return;
       }
 
       const faceVector = JSON.stringify(Array.from(detections.descriptor));
       
-      // Capture snapshot for profile image
       let profileImage = null;
       if (ctx) {
         profileImage = canvas.toDataURL('image/jpeg', 0.7);
@@ -307,28 +372,27 @@ const fetchCustomFields = async () => {
       });
 
       if (existingRes.rows && existingRes.rows.length > 0) {
-        setStatus('이미 등록된 학생입니다.');
-        alert(`이미 '${formData.name}'(생일: ${formData.birthDate}) 학생이 등록되어 있습니다. 중복 등록은 불가능합니다.`);
+        setStatus('이미 등록된 회원입니다.');
+        alert(`이미 '${formData.name}'(생일: ${formData.birthDate}) 회원이 등록되어 있습니다. 중복 등록은 불가능합니다.`);
         setIsCapturing(false);
+        isRegisteringRef.current = false;
         return;
       }
 
       const insertResult = await insertRows('students', [insertData]);
 
-      // 방금 삽입된 학생 ID를 가져옵니다 (insertResult 에 ID가 포함된다고 가정)
       let newStudentId: number | null = null;
       if (insertResult && insertResult.rows && insertResult.rows[0] && insertResult.rows[0].id) {
         newStudentId = insertResult.rows[0].id;
       } else {
-        // fallback: 이름+생년일로 조회
         const fetchRes = await queryTable('students', { filters: { name: formData.name, birth_date: formData.birthDate } });
         if (fetchRes.rows && fetchRes.rows.length > 0) newStudentId = fetchRes.rows[0].id;
       }
 
       setStatus('등록 완료!');
-      alert(`${formData.name} 학생이 성공적으로 등록되었습니다.`);
+      alert(`${formData.name} 회원이 성공적으로 등록되었습니다.`);
 
-      // 자동 SMS 발송 (입학 알림 예시, IN 타입 사용)
+      // 자동 SMS 발송
       if (newStudentId) {
         try {
           const smsRes = await sendAttendanceSMSAction(newStudentId, 'IN');
@@ -361,42 +425,59 @@ const fetchCustomFields = async () => {
         resetData[field.field_name] = '';
       });
       setFormData(resetData);
+      
+      // Redirect to the correct student list/menu path based on platform
+      if (isMobile) {
+        router.push('/m/students');
+      } else {
+        router.push('/admin/students');
+      }
     } catch (err: any) {
       console.error('등록 실패:', err);
       setStatus(`등록 실패: ${err.message}`);
     } finally {
       setIsCapturing(false);
+      isRegisteringRef.current = false;
     }
   };
 
   if (!mounted) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <h2 style={{ fontSize: '40px', fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.05em', cursor: 'pointer' }}>신규회원등록</h2>
+    <div className={isMobile ? "p-4 flex flex-col gap-4 pb-24" : "flex flex-col gap-6"}>
+      {isMobile ? (
+        <header className="bg-white/80 backdrop-blur-xl px-4 py-3 sticky top-0 z-10 shadow-sm border-b border-slate-200/50 flex items-center gap-3 -mx-4 -mt-4 mb-2">
+          <Link href="/m/students" className="p-2 -ml-2 text-slate-400 hover:text-slate-700 bg-slate-100/50 hover:bg-slate-100 rounded-full transition-colors">
+            <ArrowLeft size={20} />
           </Link>
-        </div>
-        <div>
-          <Link 
-            href="/" 
-            className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-600 transition-colors cursor-pointer no-underline"
-          >
-            <Home size={20} />
-            <span>홈으로 가기</span>
-          </Link>
-        </div>
-      </header>
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">신규회원등록</h1>
+        </header>
+      ) : (
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Link href="/" className="no-underline">
+              <h2 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight m-0 cursor-pointer">신규회원등록</h2>
+            </Link>
+          </div>
+          <div>
+            <Link 
+              href="/" 
+              className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-600 transition-colors cursor-pointer no-underline"
+            >
+              <Home size={20} />
+              <span>홈으로 가기</span>
+            </Link>
+          </div>
+        </header>
+      )}
 
-      <main style={{ display: 'flex', gap: '40px', alignItems: 'flex-start', justifyContent: 'center' }}>
+      <main className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-stretch lg:items-start justify-center">
         {/* Left: Form */}
         {!isCameraOn && (
-          <div style={{ flex: 1 }} className="bg-white/80 backdrop-blur-xl p-8 md:p-12 rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
+          <div style={{ flex: 1 }} className="bg-white/80 backdrop-blur-xl p-6 md:p-12 rounded-3xl md:rounded-[48px] border border-white shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">학생 이름 *</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-blue-500">회원 이름 *</label>
               <input
                 name="name"
                 value={formData.name}
@@ -524,15 +605,10 @@ const fetchCustomFields = async () => {
         )}
 
         {/* Right: AI Registration */}
-        <div style={{ 
-          flex: isCameraOn ? '0 1 640px' : 1, 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          gap: '32px',
-          width: '100%',
-          transition: 'all 0.5s ease-in-out'
-        }}>
+        <div 
+          className="flex flex-col items-center gap-6 w-full transition-all duration-500 ease-in-out"
+          style={{ flex: isCameraOn ? '0 1 640px' : 1 }}
+        >
           <div style={{ backgroundColor: '#0F172A', width: '100%', borderRadius: '40px', padding: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
             {/* Scanner Effect */}
             {isCameraOn && (
@@ -579,6 +655,47 @@ const fetchCustomFields = async () => {
                 style={{ transform: `scaleX(-1) scale(${zoom})`, transformOrigin: 'center' }} 
                 className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-200 pointer-events-none" 
               />
+              {flashActive && (
+                <div className="absolute inset-0 bg-white z-50 animate-flash pointer-events-none" />
+              )}
+
+              {camError && (
+                <div className="absolute inset-0 flex items-center justify-center p-4 bg-slate-950/95 z-30 pointer-events-auto">
+                  <div className="text-center p-4 max-w-xs flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-red-950/40 border border-red-500/30 flex items-center justify-center text-red-400">
+                      <TriangleAlert className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <h4 className="text-sm font-black text-white">카메라 연결 실패</h4>
+                    <p className="text-[10px] text-slate-400 font-bold leading-relaxed whitespace-pre-wrap">{camError}</p>
+                    <div className="flex gap-2 mt-2 w-full">
+                      <button 
+                        onClick={() => {
+                          setStatus('');
+                          clearError();
+                        }}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold text-[10px] py-2.5 rounded-full border border-slate-700 active:scale-95 transition-transform"
+                      >
+                        닫기
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          setStatus('카메라 켜는 중...');
+                          clearError();
+                          try {
+                            await start();
+                            setStatus('');
+                          } catch (err: any) {
+                            setStatus(`카메라 접근 실패: ${err.message}`);
+                          }
+                        }}
+                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] py-2.5 rounded-full active:scale-95 transition-transform shadow-lg"
+                      >
+                        다시 시도
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {!isCameraOn && (
                 <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
@@ -658,7 +775,7 @@ const fetchCustomFields = async () => {
             <ul className="space-y-3 text-sm text-slate-600 font-medium leading-relaxed">
               <li className="flex gap-3"><span className="text-slate-900 font-black">1.</span> 조명이 밝은 곳에서 정면을 응시해 주세요.</li>
               <li className="flex gap-3"><span className="text-slate-900 font-black">2.</span> 안경이나 마스크는 인식을 방해할 수 있습니다.</li>
-              <li className="flex gap-3"><span className="text-slate-900 font-black">3.</span> 이름과 생년월일이 같은 관원은 중복 등록되지 않습니다.</li>
+              <li className="flex gap-3"><span className="text-slate-900 font-black">3.</span> 이름과 생년월일이 같은 회원은 중복 등록되지 않습니다.</li>
             </ul>
           </div>
         </div>
@@ -672,6 +789,13 @@ const fetchCustomFields = async () => {
         }
         .animate-scan {
           animation: scan 4s ease-in-out infinite;
+        }
+        @keyframes flash {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        .animate-flash {
+          animation: flash 0.3s ease-out forwards;
         }
       `}</style>
     </div>

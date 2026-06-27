@@ -1,12 +1,11 @@
 'use client';
-// Updated: 2026-05-14 16:54:00
+// Updated: 2026-06-27 21:07:00
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useCamera } from '@/lib/useCamera';
 import { ArrowLeft, User, TriangleAlert, CheckCircle, Loader2, MonitorPlay, UserPlus, Home, Camera } from 'lucide-react';
-// import * as faceapi from '@vladmandic/face-api'; // 제거 후 useEffect 내 동적 임포트 사용
-import { queryTable, insertRows, aggregateTable, executeSQL } from '@root/egdesk-helpers';
+import { queryTable, insertRows, aggregateTable, executeSQL, getEgdeskBasePath } from '@root/egdesk-helpers';
 import { sendAttendanceSMSAction } from '../actions/sms';
 import { apiFetch } from '@/lib/api';
 
@@ -37,8 +36,21 @@ export default function AttendanceMonitorPage() {
   const autoCheckoutMinutesRef = useRef(10);
   const smsEnabledRef = useRef(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
-  const { stream, error: camError, start, stop, toggle } = useCamera();
+  const { stream, error: camError, start, stop, toggle, clearError } = useCamera();
   const isCameraOn = !!stream;
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || '';
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+      const isMobileWidth = window.innerWidth <= 1024;
+      setIsMobile(isMobileUA || isMobileWidth);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   const [cameraFilters, setCameraFilters] = useState('brightness(1.10) contrast(1.10) saturate(1.00)');
 
   // 실시간 카메라 자동 노출(밝기/채도/대비) 조절 로직
@@ -70,27 +82,22 @@ export default function AttendanceMonitorPage() {
           
           const avgLuminance = totalLuminance / (16 * 16);
           
-          // 주변 조도(실내/실외)에 따라 밝기(bVal), 대비(cVal), 채도(sVal) 자동 캘리브레이션
           let bVal = 1.10;
           let cVal = 1.10;
           let sVal = 1.00;
           
           if (avgLuminance < 70) {
-            // 매우 어두운 실내 -> 밝기 대폭 상향 및 대비 보정
             bVal = 1.45;
             cVal = 1.25;
             sVal = 1.10;
           } else if (avgLuminance < 110) {
-            // 일반 어두운 실내 -> 밝기 보정
             bVal = 1.25;
             cVal = 1.15;
           } else if (avgLuminance > 180) {
-            // 야외 또는 매우 밝은 실조 -> 조도를 낮춰 얼굴 흐려짐 방지
             bVal = 0.95;
             cVal = 1.20;
             sVal = 0.90;
           } else if (avgLuminance > 150) {
-            // 일반 밝은 조도 -> 밝기 소폭 감소
             bVal = 1.00;
             cVal = 1.15;
           }
@@ -100,7 +107,7 @@ export default function AttendanceMonitorPage() {
           console.warn('Auto exposure analysis failed:', e);
         }
       }
-      setTimeout(checkBrightness, 2000); // 2초마다 갱신
+      setTimeout(checkBrightness, 2000);
     };
     
     const delayId = setTimeout(checkBrightness, 1000);
@@ -135,11 +142,11 @@ export default function AttendanceMonitorPage() {
     isPageMounted.current = true;
     setMounted(true);
 
-    // 1. Load AI Models
     const loadModels = async () => {
       try {
         const faceapi = await import('@vladmandic/face-api');
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/';
+        const basePath = getEgdeskBasePath();
+        const MODEL_URL = `${basePath}/models/`;
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -153,7 +160,6 @@ export default function AttendanceMonitorPage() {
       }
     };
 
-    // 2. Fetch Data from DB
     const fetchData = async () => {
       try {
         const res = await apiFetch('/api/attendance_init');
@@ -189,14 +195,12 @@ export default function AttendanceMonitorPage() {
     loadModels();
     fetchData();
 
-    // 3. Update Clock
     const updateClock = () => {
       const now = new Date();
       const todayStr = now.toLocaleDateString('en-CA');
       
       if (!isPageMounted.current) return;
 
-      // 날짜가 바뀌었을 경우 리셋
       if (todayStr !== lastDateRef.current) {
         setTodayCount(0);
         setRecentLogs([]);
@@ -216,8 +220,6 @@ export default function AttendanceMonitorPage() {
     };
   }, []);
 
-  // stopVideo removed; use hook's stop instead
-
   const toggleCamera = async () => {
     if (isCameraOn) {
       stop();
@@ -225,8 +227,10 @@ export default function AttendanceMonitorPage() {
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
+      setCameraError('');
+      clearError();
     } else {
-      await start();
+      await startVideo();
     }
   };
 
@@ -234,23 +238,28 @@ export default function AttendanceMonitorPage() {
 
   const startVideo = async () => {
     if (!isPageMounted.current) return;
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-      setCameraError('이 브라우저에서는 카메라를 사용할 수 없습니다. (HTTPS 환경 또는 PC 필요)');
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      setCameraError('보안 연결(HTTPS)이 필요합니다.\n모바일 기기로 외부/LAN에서 접속 시 보안(SSL)인증서가 활성화된 https:// 주소로 접속해야 카메라를 사용할 수 있습니다.\n(또는 Chrome 브라우저의 unsafely-treat-insecure-origin-as-secure 플래그에 접속 주소를 등록해주세요.)');
       return;
     }
-    if (videoRef.current?.srcObject) return; // Already active
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('이 브라우저에서는 카메라를 사용할 수 없습니다. (HTTPS 환경 또는 지원되는 기기 필요)');
+      return;
+    }
+    if (videoRef.current?.srcObject) return;
 
     try {
       await start();
       console.log('Webcam stream started');
       setCameraError('');
+      clearError();
     } catch (err: any) {
       console.error('Webcam access error:', err);
       if (isPageMounted.current) {
         let errMsg = '카메라 접근 권한이 없거나 카메라를 찾을 수 없습니다.';
-        if (err.name === 'NotAllowedError') {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
           errMsg = '카메라 접근 권한이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.';
-        } else if (err.name === 'NotFoundError') {
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
           errMsg = 'PC에 연결된 카메라 장치를 찾을 수 없습니다. 웹캠이 제대로 연결되어 있는지 확인해주세요.';
         } else if (err.name === 'NotReadableError') {
           errMsg = '카메라가 이미 다른 프로그램(예: 줌, 카카오톡, 다른 브라우저 탭)에서 사용 중입니다.';
@@ -264,10 +273,6 @@ export default function AttendanceMonitorPage() {
     }
   };
 
-  useEffect(() => {
-    // No automatic start; user triggers via toggleCamera
-  }, [isModelLoaded]);
-
   // 실시간 얼굴 인식 루프
   useEffect(() => {
     if (!isModelLoaded) return;
@@ -278,7 +283,6 @@ export default function AttendanceMonitorPage() {
     const recognitionLoop = async () => {
       if (!isRunning) return;
       
-      // Stricter check: video must be ready AND have positive dimensions AND be playing
       const video = videoRef.current;
       if (!video || video.readyState < 3 || !video.videoWidth || !video.videoHeight || video.videoWidth === 0 || video.videoHeight === 0 || video.paused) {
         requestAnimationFrame(recognitionLoop);
@@ -290,7 +294,6 @@ export default function AttendanceMonitorPage() {
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
-        // 캔버스 크기 조정
         const displayWidth = video.offsetWidth || video.videoWidth;
         const displayHeight = video.offsetHeight || video.videoHeight;
         
@@ -304,7 +307,6 @@ export default function AttendanceMonitorPage() {
           faceapi.matchDimensions(canvas, displaySize);
         }
 
-        // 탐지 시작 (다중 얼굴 인식으로 변경, 인식 성능과 속도 개선을 위해 임계값 조정)
         const detections = await faceapi
           .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.25 }))
           .withFaceLandmarks()
@@ -313,10 +315,22 @@ export default function AttendanceMonitorPage() {
         const ctx = canvas.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (detections && detections.length > 0) {
+        if (ctx && detections && detections.length > 0) {
           const resizedDetections = faceapi.resizeResults(detections, displaySize);
           
           for (const detection of resizedDetections) {
+            const box = detection.detection?.box || detection.box;
+            if (!box) continue;
+            const { x, y, width, height } = box;
+
+            // Expand drawn box size by 20% (10% padding on each side)
+            const padW = width * 0.10;
+            const padH = height * 0.10;
+            const drawX = x - padW;
+            const drawY = y - padH;
+            const drawWidth = width + padW * 2;
+            const drawHeight = height + padH * 2;
+
             const descriptor = detection.descriptor;
             let bestMatch = { student: null as Student | null, distance: 1.0 };
 
@@ -331,8 +345,41 @@ export default function AttendanceMonitorPage() {
               } catch (e) {}
             }
 
-            if (bestMatch.student && bestMatch.distance < 0.5) {
-              handleRecognitionSuccess(bestMatch.student);
+            const isMatched = bestMatch.student && bestMatch.distance < 0.5;
+
+            // Draw glowing bounding box
+            ctx.strokeStyle = isMatched ? '#10B981' : '#3B82F6';
+            ctx.lineWidth = 4;
+            if (isMatched) {
+              ctx.shadowColor = '#10B981';
+              ctx.shadowBlur = 15;
+            } else {
+              ctx.shadowColor = '#3B82F6';
+              ctx.shadowBlur = 5;
+            }
+            ctx.beginPath();
+            ctx.roundRect(drawX, drawY, drawWidth, drawHeight, 16);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Draw matching status text on canvas (mirrored scale correction)
+            ctx.fillStyle = isMatched ? '#10B981' : '#3B82F6';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.save();
+            ctx.translate(drawX + drawWidth / 2, drawY - 10);
+            ctx.scale(-1, 1);
+            ctx.textAlign = 'center';
+            ctx.fillText(
+              isMatched 
+                ? `${bestMatch.student!.name} (${Math.round((1 - bestMatch.distance) * 100)}%)`
+                : '얼굴 분석 중...', 
+              0, 
+              0
+            );
+            ctx.restore();
+
+            if (isMatched) {
+              handleRecognitionSuccess(bestMatch.student!);
             }
           }
         }
@@ -352,8 +399,8 @@ export default function AttendanceMonitorPage() {
     const todayStr = new Date().toLocaleDateString('en-CA');
     const lastRecognized = recognitionCooldowns.current.get(student.id) || 0;
     
-    // 1. 30분 이내 추가 출결처리 방지 (30분 = 30 * 60 * 1000 = 1,800,000ms)
-    if (now - lastRecognized < 30 * 60 * 1000) {
+    // 1. 5초 이내 추가 출결처리 방지
+    if (now - lastRecognized < 5 * 1000) {
       return;
     }
     recognitionCooldowns.current.set(student.id, now);
@@ -377,10 +424,7 @@ export default function AttendanceMonitorPage() {
         const lastTime = new Date(lastEntry.timestamp).getTime();
         const diffMinutes = (now - lastTime) / (1000 * 60);
 
-        if (diffMinutes < 30) {
-          // 30분 이내 추가 출결처리 제한 -> 아예 인식 자체를 차단하고 무시
-          return;
-        } else if (lastEntry.type === 'IN') {
+        if (lastEntry.type === 'IN') {
           if (diffMinutes < autoCheckoutMinutesRef.current) {
             determinedType = 'DUPLICATE';
           } else {
@@ -394,7 +438,6 @@ export default function AttendanceMonitorPage() {
               sms_status: (smsEnabledRef.current && student.receive_sms_out !== 'false') ? 'SENDING' : 'NONE'
             }]);
             
-            // 과금용 사용량 통계 로깅 (얼굴 인식 건수 증가)
             await insertRows('tkd_usage_logs', [{
               type: 'FACE',
               timestamp: localISO,
@@ -405,7 +448,6 @@ export default function AttendanceMonitorPage() {
           determinedType = 'DUPLICATE';
         }
       } else {
-        // 신규 출근 처리
         determinedType = 'IN';
         const localISO = new Date(now - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
         await insertRows('attendance_logs', [{
@@ -416,7 +458,6 @@ export default function AttendanceMonitorPage() {
           sms_status: (smsEnabledRef.current && student.receive_sms_in !== 'false') ? 'SENDING' : 'NONE'
         }]);
 
-        // 과금용 사용량 통계 로깅 (얼굴 인식 건수 증가)
         await insertRows('tkd_usage_logs', [{
           type: 'FACE',
           timestamp: localISO,
@@ -428,10 +469,8 @@ export default function AttendanceMonitorPage() {
       return;
     }
 
-    // UI 업데이트: 다중 팝업 지원 (팝업은 중복인 경우에도 알림을 위해 표시)
     setMatchedStudents((prev) => [...prev, { student, type: determinedType }]);
     
-    // 최근 기록 업데이트 (실제 출근/퇴근인 경우에만 추가)
     if (determinedType !== 'DUPLICATE') {
       setRecentLogs((prev) => [
         { 
@@ -442,19 +481,15 @@ export default function AttendanceMonitorPage() {
         ...prev.slice(0, 4)
       ]);
 
-      // 오늘 출근 수 증가 (신규 출근인 경우에만)
       if (determinedType === 'IN') {
         setTodayCount((prev) => prev + 1);
       }
 
-      // 학부모 알림 문자 발송 (설정된 경우 & 관원이 해당 타입 수신 동의한 경우)
       if (smsEnabledRef.current && ((determinedType === 'IN' && student.receive_sms_in !== 'false') || (determinedType === 'OUT' && student.receive_sms_out !== 'false'))) {
-        // 발송 중 상태 표시
         setMatchedStudents(prev => prev.map(item => 
           item.student.id === student.id ? { ...item, smsStatus: 'SENDING' } : item
         ));
 
-        // 비동기 발송 및 결과 반영 (디버그 로그 추가)
         console.log('[SMS] Calling server action for student:', student.id);
         sendAttendanceSMSAction(student.id, determinedType).then(res => {
           console.log('[SMS] Server action response:', res);
@@ -471,7 +506,6 @@ export default function AttendanceMonitorPage() {
       }
     }
 
-    // 3초 후 해당 학생 팝업 제거
     setTimeout(() => {
       setMatchedStudents((prev) => prev.filter(s => s.student.id !== student.id));
     }, 3000);
@@ -491,7 +525,6 @@ export default function AttendanceMonitorPage() {
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isCameraOn ? 'opacity-95' : 'opacity-0'}`}
           style={{ transform: 'scaleX(-1)', filter: cameraFilters }}
         />
-        {/* HUD Scanner Effect overlay */}
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
         {isCameraOn && <div className="absolute top-0 left-0 w-full h-2 bg-blue-500/30 blur-md animate-scan z-0"></div>}
       </div>
@@ -509,21 +542,43 @@ export default function AttendanceMonitorPage() {
             boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.65)',
             borderRadius: '32px'
           }}
-          className="w-[410px] h-[500px] md:w-[850px] md:h-[1000px]"
+          className="w-[320px] h-[400px] sm:w-[380px] sm:h-[480px] md:w-[850px] md:h-[1000px]"
         />
       )}
       
       <canvas 
         ref={canvasRef} 
+        style={{ transform: 'scaleX(-1)' }}
         className="absolute inset-0 w-full h-full pointer-events-none z-10" 
       />
 
-      {cameraError && (
-        <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/80">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <TriangleAlert size={64} className="text-red-500" />
-            <h2 className="text-2xl font-bold text-white">카메라 에러</h2>
-            <p className="text-slate-300 max-w-md">{cameraError}</p>
+      {(cameraError || camError) && (
+        <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/90">
+          <div className="flex flex-col items-center gap-4 text-center p-6 max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl pointer-events-auto">
+            <TriangleAlert size={48} className="text-red-500 animate-pulse" />
+            <h2 className="text-lg font-black text-white">카메라 연결 실패</h2>
+            <p className="text-slate-400 text-xs font-bold leading-relaxed whitespace-pre-wrap">{cameraError || camError}</p>
+            <div className="flex gap-3 mt-2 w-full">
+              <button 
+                onClick={() => {
+                  setCameraError('');
+                  clearError();
+                }}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-4 py-3 rounded-full transition-all active:scale-95 border border-slate-700"
+              >
+                닫기
+              </button>
+              <button 
+                onClick={async () => {
+                  setCameraError('');
+                  clearError();
+                  await startVideo();
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-3 rounded-full transition-all active:scale-95 shadow-lg"
+              >
+                다시 시도
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -546,10 +601,10 @@ export default function AttendanceMonitorPage() {
       </div>
 
       {/* UI Overlay */}
-      <div className="absolute inset-0 flex flex-col justify-between p-6 md:p-16 pointer-events-none z-20">
+      <div className="absolute inset-0 flex flex-col justify-between p-6 pb-20 md:p-16 pointer-events-none z-20">
         {/* Top Bar - Glassmorphism */}
         <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-          <Link href="/" className="flex flex-col items-start gap-0.5 cursor-pointer no-underline hover:opacity-80 transition-opacity">
+          <Link href={isMobile ? "/m" : "/"} className="flex flex-col items-start gap-0.5 cursor-pointer no-underline hover:opacity-80 transition-opacity">
             <div className="text-lg md:text-2xl font-bold text-white tracking-tight opacity-80">
               {currentDate}
             </div>
@@ -574,7 +629,7 @@ export default function AttendanceMonitorPage() {
               </button>
 
               <Link
-                href="/"
+                href={isMobile ? "/m" : "/"}
                 className="pointer-events-auto bg-slate-900/80 hover:bg-slate-900 text-white px-5 py-3 md:px-8 md:py-4 rounded-full border border-white/20 backdrop-blur-md transition-all text-xs md:text-base font-bold shadow-2xl active:scale-95 flex items-center gap-2 no-underline whitespace-nowrap"
               >
                 <Home className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
@@ -591,7 +646,7 @@ export default function AttendanceMonitorPage() {
         </div>
 
         {/* Center Target Guide - Futuristic Responsive (영역 20% 추가 확장) */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[410px] h-[500px] md:w-[850px] md:h-[1000px] pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[400px] sm:w-[380px] sm:h-[480px] md:w-[850px] md:h-[1000px] pointer-events-none">
           {/* Corner Brackets */}
           <div className="absolute top-0 left-0 w-12 h-12 md:w-16 md:h-16 border-t-4 border-l-4 border-blue-500/50 rounded-tl-3xl"></div>
           <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 border-t-4 border-r-4 border-blue-500/50 rounded-tr-3xl"></div>
