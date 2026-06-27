@@ -1,6 +1,6 @@
 /**
  * EGDesk User Data Configuration
- * Generated at: 2026-06-18T06:47:13.407Z
+ * Generated at: 2026-06-27T12:45:42.997Z
  *
  * This file contains type-safe definitions for your EGDesk tables.
  */
@@ -52,14 +52,14 @@ export const TABLES = {
   table5: {
     name: 'attendance_logs',
     displayName: '출결 기록',
-    rowCount: 2,
+    rowCount: 11,
     columnCount: 6,
     columns: ['id', 'student_id', 'timestamp', 'type', 'status', 'sms_status']
   } as TableDefinition,
   table6: {
     name: 'students',
     displayName: '학생 명단',
-    rowCount: 1,
+    rowCount: 0,
     columnCount: 13,
     columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id', 'status', 'receive_sms_in', 'receive_sms_out']
   } as TableDefinition,
@@ -80,7 +80,7 @@ export const TABLES = {
   table9: {
     name: 'payment_records',
     displayName: '수납 기록',
-    rowCount: 0,
+    rowCount: 3,
     columnCount: 6,
     columns: ['id', 'student_id', 'amount', 'payment_date', 'depositor_name', 'status']
   } as TableDefinition,
@@ -94,21 +94,21 @@ export const TABLES = {
   table11: {
     name: 'tkd_system_settings',
     displayName: '태권도 시스템 설정',
-    rowCount: 5,
+    rowCount: 6,
     columnCount: 3,
     columns: ['id', 'key', 'value']
   } as TableDefinition,
   table12: {
     name: 'cctv_records',
     displayName: 'CCTV 녹화 기록',
-    rowCount: 1,
+    rowCount: 7,
     columnCount: 5,
     columns: ['id', 'date', 'filename', 'size', 'url']
   } as TableDefinition,
   table13: {
     name: 'cctv_events',
     displayName: 'CCTV 이상 감지',
-    rowCount: 1,
+    rowCount: 14,
     columnCount: 5,
     columns: ['id', 'timestamp', 'type', 'snapshot', 'video_url']
   } as TableDefinition,
