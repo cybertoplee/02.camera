@@ -12,7 +12,7 @@ export class GoogleMessagesAutomation {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
-  private currentHeadless: boolean | null = null;
+  private currentHeadless: boolean | undefined = undefined;
 
   /**
    * 브라우저 초기화 및 세션 로드
@@ -35,6 +35,9 @@ export class GoogleMessagesAutomation {
         await this.close();
       }
     }
+
+    // 신규 브라우저 실행 전에 기존 락 파일이 있으면 제거
+    this.clearLockFiles();
 
     // 신규 브라우저 실행 전에 기존 락 프로세스가 있는지 확인하고 정리
     this.killExistingProcesses();
@@ -285,22 +288,56 @@ export class GoogleMessagesAutomation {
       await this.page!.keyboard.press('Enter');
       
       // 3. 메시지 입력창 대기 및 입력
-      const msgInput = await this.page!.waitForSelector('textarea, div[role="textbox"][contenteditable="true"], .textarea', { timeout: 8000 });
-      await msgInput.focus();
+      const msgInput = await this.page!.waitForSelector([
+        'div[role="textbox"][contenteditable="true"]',
+        '[data-e2e="message-input-textbox"]',
+        'div[contenteditable="true"]',
+        'textarea',
+        '.textarea'
+      ].join(', '), { timeout: 8000 });
       
-      // 빠른 fill() 시도 후 실패시 타이핑
+      await msgInput.focus();
+      await msgInput.click();
+      
+      // 전체 선택 후 지우기
+      await this.page!.keyboard.down('Control');
+      await this.page!.keyboard.press('a');
+      await this.page!.keyboard.up('Control');
+      await this.page!.keyboard.press('Backspace');
+      await this.page!.waitForTimeout(200);
+      
+      // 실제 유저처럼 타이핑하여 React/Angular 상태가 확실히 반영되도록 함
+      await this.page!.keyboard.type(message, { delay: 10 });
+      
+      // 4. 전송 (보내기 버튼 클릭 또는 Enter)
+      await this.page!.waitForTimeout(500);
+      let sent = false;
       try {
-        await msgInput.fill(message, { timeout: 2000 });
-      } catch (e) {
-        await this.page!.keyboard.type(message, { delay: 20 });
+        const sendButton = this.page!.locator([
+          'button[aria-label*="보내기"]',
+          'button[aria-label*="전송"]',
+          'button[aria-label*="Send"]',
+          '[data-e2e="send-message-button"]',
+          'button.send-button',
+          'button:has(mat-icon:has-text("send"))',
+          'button:has(mat-icon)'
+        ].join(', ')).first();
+
+        if (await sendButton.isVisible({ timeout: 2000 })) {
+          await sendButton.click({ timeout: 2000 });
+          sent = true;
+          console.log('[GoogleMessages] 전송 버튼 클릭 완료');
+        }
+      } catch (clickErr) {
+        console.log('[GoogleMessages] 전송 버튼을 찾지 못했거나 클릭 실패, Enter 키로 전송합니다.');
       }
 
-      // 4. 전송 (Enter)
-      await this.page!.waitForTimeout(500);
-      await this.page!.keyboard.press('Enter');
+      if (!sent) {
+        await this.page!.keyboard.press('Enter');
+      }
       
-      // 5. 전송 완료 확인을 위한 최소 대기 (3초 -> 1.5초)
-      await this.page!.waitForTimeout(1500);
+      // 5. 전송 완료 확인을 위한 최소 대기 (1.5초 -> 3.0초)
+      await this.page!.waitForTimeout(3000);
       
       console.log(`[GoogleMessages] 발송 명령 완료: ${phoneNumber}`);
       return { success: true };
@@ -315,11 +352,29 @@ export class GoogleMessagesAutomation {
     }
   }
 
+  private clearLockFiles() {
+    try {
+      const lockFiles = [
+        path.join(USER_DATA_DIR, 'SingletonLock'),
+        path.join(USER_DATA_DIR, 'lockfile'),
+        path.join(USER_DATA_DIR, 'LOCK')
+      ];
+      for (const file of lockFiles) {
+        if (fs.existsSync(file)) {
+          console.log(`[GoogleMessages] 락 파일 감지 및 제거 중: ${file}`);
+          fs.unlinkSync(file);
+        }
+      }
+    } catch (err: any) {
+      console.warn('[GoogleMessages] 락 파일 제거 실패:', err.message);
+    }
+  }
+
   private killExistingProcesses() {
     if (process.platform !== 'win32') return;
     try {
       const { execSync } = require('child_process');
-      const output = execSync('wmic process where "name=\'chrome.exe\'" get processid,commandline', { encoding: 'utf8' });
+      const output = execSync('wmic process where "name=\'chrome.exe\' or name=\'chromium.exe\'" get processid,commandline', { encoding: 'utf8' });
       const lines = output.split('\n');
       for (const line of lines) {
         if (line.includes('playwright-profile')) {
@@ -344,7 +399,7 @@ export class GoogleMessagesAutomation {
       this.browser = null;
       this.context = null;
       this.page = null;
-      this.currentHeadless = null;
+      this.currentHeadless = undefined;
     }
   }
 }

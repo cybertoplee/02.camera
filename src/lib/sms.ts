@@ -101,6 +101,18 @@ export async function sendAttendanceSMS(studentId: number, type: 'IN' | 'OUT') {
 
     if (result.success) {
       logToFile(`[성공] 발송 완료 (${student.parent_phone})`);
+      // 과금용 사용량 통계 로깅 (문자 발송 건수 증가)
+      try {
+        const localISO = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+        await insertRows('tkd_usage_logs', [{
+          type: 'SMS',
+          timestamp: localISO,
+          student_id: studentId
+        }]);
+        logToFile(`[사용량 로깅 성공] 학생 ${studentId} SMS`);
+      } catch (e: any) {
+        logToFile(`[사용량 로깅 에러] ${e.message}`);
+      }
     } else {
       logToFile(`[실패] 발송 에러: ${result.error}`);
     }
