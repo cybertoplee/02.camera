@@ -1,6 +1,6 @@
 /**
  * EGDesk User Data Configuration
- * Generated at: 2026-06-27T12:45:42.997Z
+ * Generated at: 2026-06-27T23:57:48.487Z
  *
  * This file contains type-safe definitions for your EGDesk tables.
  */
@@ -59,7 +59,7 @@ export const TABLES = {
   table6: {
     name: 'students',
     displayName: '학생 명단',
-    rowCount: 0,
+    rowCount: 1,
     columnCount: 13,
     columns: ['id', 'name', 'parent_name', 'parent_phone', 'birth_date', 'rank', 'memo', 'face_vector', 'profile_image', 'class_id', 'status', 'receive_sms_in', 'receive_sms_out']
   } as TableDefinition,
